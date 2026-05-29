@@ -96,8 +96,8 @@ export default function ActiveWorkout({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-zinc-950">
-      <header className="safe-top flex items-center justify-between border-b border-zinc-800/80 px-4 py-3 backdrop-blur-xl">
+    <div className="fixed inset-0 z-40 flex flex-col bg-zinc-950">
+      <header className="safe-top flex items-center justify-between border-b border-zinc-800/80 px-4 pb-3 pt-14 backdrop-blur-xl">
         <button
           type="button"
           onClick={onCancel}

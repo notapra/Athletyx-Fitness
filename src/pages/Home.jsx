@@ -10,7 +10,6 @@ import {
   Zap,
 } from 'lucide-react'
 import { useApp } from '../hooks/useApp.js'
-import Card from '../components/ui/Card.jsx'
 import PRCard from '../components/PRCard.jsx'
 import SessionCard from '../components/SessionCard.jsx'
 import {
@@ -22,7 +21,10 @@ import {
 import { getTrainingStreak, trainedToday } from '../utils/date.js'
 import { getProgressiveOverloadSuggestions, getTrainingInsights } from '../utils/insights.js'
 import GuardianReminder from '../components/ai/GuardianReminder.jsx'
+import AnatomicalBodyMap from '../components/body/AnatomicalBodyMap.jsx'
+import Card from '../components/ui/Card.jsx'
 import { useGuardian } from '../hooks/useGuardian.js'
+import { useMuscleAnalytics } from '../hooks/useMuscleAnalytics.js'
 
 export default function Home({ onStartWorkout }) {
   const { sessions, goals, startWorkout, guardianReminder, dismissGuardianReminder, setGuardianReminder } =
@@ -49,6 +51,7 @@ export default function Home({ onStartWorkout }) {
   const insights = useMemo(() => getTrainingInsights(sessions), [sessions])
   const suggestions = useMemo(() => getProgressiveOverloadSuggestions(sessions), [sessions])
   const activeGoals = goals.filter((g) => !g.completed).slice(0, 2)
+  const { muscles, muscleById } = useMuscleAnalytics({ days: 30 })
 
   function handleQuickStart() {
     if (onStartWorkout) onStartWorkout()
@@ -56,8 +59,18 @@ export default function Home({ onStartWorkout }) {
   }
 
   return (
-    <div className="space-y-5 px-4 pt-6 pb-4">
+    <div className="space-y-5 px-4 pt-2 pb-4">
       <GuardianReminder reminder={guardianReminder} onDismiss={dismissGuardianReminder} />
+
+      <section>
+        <h2 className="mb-1 text-sm font-semibold text-white">Muscle development map</h2>
+        <p className="mb-3 text-xs text-zinc-500">
+          Tap a region for strength tier, volume, and AI cues.
+        </p>
+        <Card className="!p-4">
+          <AnatomicalBodyMap muscles={muscles} muscleById={muscleById} />
+        </Card>
+      </section>
 
       <header>
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400/80">

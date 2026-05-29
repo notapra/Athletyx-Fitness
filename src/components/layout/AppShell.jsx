@@ -1,7 +1,14 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import BottomNav from './BottomNav.jsx'
+import DynamicIsland from '../workout/DynamicIsland.jsx'
 
-export default function AppShell({ activeTab, onTabChange, children, hideNav = false }) {
+export default function AppShell({
+  activeTab,
+  onTabChange,
+  children,
+  hideNav = false,
+  showIsland = true,
+}) {
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -25,7 +32,11 @@ export default function AppShell({ activeTab, onTabChange, children, hideNav = f
         />
       </motion.div>
 
-      <main className={`app-scroll mx-auto min-h-svh max-w-lg ${hideNav ? 'pb-6' : 'pb-28'} safe-top`}>
+      {showIsland ? <DynamicIsland /> : null}
+
+      <main
+        className={`app-scroll mx-auto min-h-svh max-w-lg ${hideNav ? 'pb-6' : 'pb-28'} ${showIsland ? 'pt-[4.5rem]' : ''} safe-top`}
+      >
         <AnimatePresence mode="wait">
           <motion.div
             key={activeTab}

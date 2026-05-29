@@ -4,6 +4,7 @@ import { AppProvider } from './context/AppContext.jsx'
 import { useApp } from './hooks/useApp.js'
 import AppShell from './components/layout/AppShell.jsx'
 import ActiveWorkout from './components/workout/ActiveWorkout.jsx'
+import DynamicIsland from './components/workout/DynamicIsland.jsx'
 import SessionSummaryModal from './components/workout/SessionSummaryModal.jsx'
 import { useRestTimer } from './hooks/useRestTimer.js'
 import { getSessionSummary } from './utils/insights.js'
@@ -71,6 +72,7 @@ function AppContent() {
   if (workoutMode && activeSession) {
     return (
       <>
+        <DynamicIsland />
         <ActiveWorkout
           session={activeSession}
           onUpdate={setActiveSession}
@@ -95,7 +97,7 @@ function AppContent() {
 
   return (
     <>
-      <AppShell activeTab={activeTab} onTabChange={setActiveTab}>
+      <AppShell activeTab={activeTab} onTabChange={setActiveTab} showIsland>
         {renderPage()}
       </AppShell>
       <SessionSummaryModal
