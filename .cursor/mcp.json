@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "athletyx-postgres-storage": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@localhost:54322/postgres"
+      ]
+    }
+  }
+}

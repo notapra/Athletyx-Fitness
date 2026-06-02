@@ -4,7 +4,8 @@ import { useCallback, useState } from "react";
 import ChatViewport, { type ChatMessage } from "@/components/ChatViewport";
 import ChatInput from "@/components/ChatInput";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
+const PYTHON_API_URL =
+  process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000";
 
 function createId() {
   return `m-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
@@ -36,41 +37,70 @@ export default function HomePage() {
     setInput("");
     setIsLoading(true);
 
+    const history = [...messages, userMsg].map((m) => ({
+      role: m.role as "user" | "assistant",
+      content: m.content,
+    }));
+
     try {
-      const res = await fetch(`${API_URL}/api/chat`, {
+      const agentRes = await fetch("/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: trimmed, history }),
+      });
+
+      if (agentRes.ok) {
+        const data: ChatApiResponse = await agentRes.json();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: createId(),
+            role: "assistant",
+            content: data.content,
+          },
+        ]);
+        return;
+      }
+
+      const agentErr = await agentRes.json().catch(() => ({}));
+      const agentMsg =
+        typeof agentErr?.error === "string" ? agentErr.error : null;
+
+      const fallbackRes = await fetch(`${PYTHON_API_URL}/api/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ message: trimmed }),
       });
 
-      if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+      if (fallbackRes.ok) {
+        const data: ChatApiResponse = await fallbackRes.json();
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: createId(),
+            role: "assistant",
+            content: data.content,
+          },
+        ]);
+        return;
       }
 
-      const data: ChatApiResponse = await res.json();
-
+      throw new Error(agentMsg ?? `Agent HTTP ${agentRes.status}`);
+    } catch (err) {
+      const hint =
+        err instanceof Error ? err.message : "Unknown error";
       setMessages((prev) => [
         ...prev,
         {
           id: createId(),
           role: "assistant",
-          content: data.content,
-        },
-      ]);
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: createId(),
-          role: "assistant",
-          content:
-            "Could not reach Athletyx backend. Start the API with `uvicorn backend.main:app --reload` from the **athletyx** folder.",
+          content: `Could not reach the Athletyx AI agent. Add **OPENAI_API_KEY** to \`athletyx/frontend/.env.local\` and restart \`npm run dev\`. (${hint})`,
         },
       ]);
     } finally {
       setIsLoading(false);
     }
-  }, [isLoading]);
+  }, [isLoading, messages]);
 
   return (
     <div className="flex min-h-screen flex-col">

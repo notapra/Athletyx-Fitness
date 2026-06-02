@@ -46,16 +46,26 @@ curl -X POST http://127.0.0.1:8000/api/chat ^
   -d "{\"message\": \"hypertrophy push workout\"}"
 ```
 
-## Frontend
+## Frontend (LangChain AI agent)
 
 ```bash
 cd athletyx/frontend
 cp .env.local.example .env.local
+# Edit .env.local — set OPENAI_API_KEY=sk-...
 npm install
 npm run dev
 ```
 
 Open http://localhost:3000
+
+The chat UI calls **`/api/agent`** (Next.js) which runs the LangChain agent in `frontend/services/langchainService.ts` (gpt-4o-mini + `query_science_database` tool). If the agent fails, it falls back to the Python `/api/chat` router.
+
+### LangChain packages
+
+```bash
+cd athletyx/frontend
+npm install langchain @langchain/openai @langchain/core zod
+```
 
 ## Production build
 

@@ -4,6 +4,11 @@ Premium fitness tracking — **minimal inputs, rich outputs**.
 
 IronLog (React + Vite) is the main workout app: sessions, PRs, analytics, Dynamic Island muscle tracking, and AI coaching. The `athletyx/` folder adds a conversational Python + Next.js shell for future natural-language logging and program generation.
 
+## Database (Supabase / PostgreSQL)
+
+- Migrations: [`supabase/migrations/`](supabase/migrations/) — includes `public.users` with immutable `user_id`
+- Local MCP (Cursor): [`.cursor/mcp.json`](.cursor/mcp.json) → `athletyx-postgres-storage` on `localhost:54322`
+
 ## Product plans (roadmap & architecture)
 
 All major feature plans are checked into the repo for easy browsing on GitHub:
