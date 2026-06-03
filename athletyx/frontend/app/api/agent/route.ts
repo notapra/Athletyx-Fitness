@@ -1,9 +1,20 @@
+/**
+ * Next.js Route Handler — server-side only LLM boundary.
+ *
+ * Why API route (not client):
+ * - OPENAI_API_KEY never exposed to browser
+ * - Central place for rate limits, auth, logging, eval traces
+ *
+ * AI engineer: compare with IronLog's client-side aiService (offline-first) vs this server agent.
+ */
+
 import { NextResponse } from "next/server";
 import {
   runAthletyxAgent,
   type ChatTurn,
 } from "@/services/langchainService";
 
+// LangChain + OpenAI SDK require Node APIs (not Edge)
 export const runtime = "nodejs";
 
 type AgentRequestBody = {

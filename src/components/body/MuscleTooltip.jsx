@@ -1,11 +1,20 @@
 import { motion } from 'framer-motion'
-import { estimateSubMuscle1RM, getMuscleTip } from '../../utils/subMuscleAnalytics.js'
+import {
+  estimateSubMuscle1RM,
+  getMuscleTip,
+  getRegionDisplayTip,
+} from '../../utils/subMuscleAnalytics.js'
 
 export default function MuscleTooltip({ muscle, sessions, position }) {
   if (!muscle) return null
 
-  const est1RM = estimateSubMuscle1RM(muscle.id, sessions)
-  const tip = getMuscleTip(muscle, sessions)
+  const isRegion = Array.isArray(muscle.subMuscleIds)
+  const est1RM = isRegion
+    ? null
+    : estimateSubMuscle1RM(muscle.id, sessions)
+  const tip = isRegion
+    ? getRegionDisplayTip(muscle)
+    : getMuscleTip(muscle, sessions)
 
   return (
     <motion.div

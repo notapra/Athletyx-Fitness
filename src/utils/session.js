@@ -1,3 +1,4 @@
+//id generation function, standard uuid for individual workouts
 export function createId() {
   if (globalThis.crypto?.randomUUID) return crypto.randomUUID()
   return `id-${Date.now()}-${Math.random().toString(16).slice(2)}`
@@ -7,6 +8,7 @@ export function isSession(workout) {
   return Array.isArray(workout?.exercises)
 }
 
+//migrate legacy workout data from local storage to new format
 export function migrateLegacyWorkout(w) {
   if (isSession(w)) return w
 

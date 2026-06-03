@@ -1,3 +1,13 @@
+/**
+ * Goal Guardian drift scorer — lightweight heuristic judge (0–100).
+ *
+ * Why heuristics first:
+ * - Zero marginal cost per message, works offline, easy to unit test.
+ * - Explainable reasons[] for UI and future guardian_checks audit table.
+ *
+ * Upgrade path: LLM-as-judge on high-stakes replies only, or train a small classifier.
+ */
+
 import { analyzeMuscleBalance } from './muscleBalance.js'
 
 const OFF_TOPIC_PATTERNS = [
@@ -75,6 +85,10 @@ function detectMuscleMismatch(sessions, contract) {
   return 0
 }
 
+/**
+ * Aggregates drift signals into score + level (aligned | moderate | high).
+ * Used by guardianService.reviewCoachReply for post-hoc guardrails.
+ */
 export function scoreDrift({ reply, userMessage, contract, chatHistory = [], sessions = [] }) {
   if (!contract || !reply) {
     return { score: 0, level: 'aligned', reasons: [] }

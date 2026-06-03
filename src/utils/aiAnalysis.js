@@ -1,3 +1,11 @@
+/**
+ * Feature store for coaching — deterministic analytics fed into prompts (not an LLM).
+ *
+ * Think of runFullAnalysis() as building a structured "user state" object:
+ * recovery, intensity, muscle balance, progression windows — similar to tool outputs
+ * an agent would fetch before answering, but computed locally from workout logs.
+ */
+
 import { getDashboardStats, getPersonalRecords } from './calculations.js'
 import { getProgressionSummary } from './progressionAnalysis.js'
 import { analyzeRecovery } from './recoveryAnalysis.js'
@@ -5,6 +13,7 @@ import { analyzeIntensity } from './intensityAnalysis.js'
 import { analyzeMuscleBalance } from './muscleBalance.js'
 import { filterSessionsByDays } from './aiHelpers.js'
 
+/** Single entry point for all coach/guardian features — cache result per session list in UI hooks. */
 export function runFullAnalysis(sessions) {
   const stats = getDashboardStats(sessions)
   const prs = getPersonalRecords(sessions)

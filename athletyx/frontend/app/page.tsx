@@ -1,3 +1,11 @@
+/**
+ * Athletyx chat UI — dual backend fallback for resilience:
+ * 1. POST /api/agent (LangChain + gpt-4o-mini + query_science_database tool)
+ * 2. Python FastAPI /api/chat (rule router + workout/log tools)
+ *
+ * AI engineer: compare observability — LangChain returns provider/model; Python returns tool_used.
+ */
+
 "use client";
 
 import { useCallback, useState } from "react";

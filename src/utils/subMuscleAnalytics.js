@@ -265,6 +265,51 @@ export function estimateSubMuscle1RM(subMuscleId, sessions) {
   return best > 0 ? best : null
 }
 
+/** Roll up sub-muscle stats into a simplified map region (volume-weighted score). */
+export function aggregateRegionMuscle(regionId, regionDef, muscleById) {
+  const parts = regionDef.subMuscleIds
+    .map((id) => muscleById[id])
+    .filter(Boolean)
+
+  const volume = parts.reduce((sum, p) => sum + p.volume, 0)
+  const sets = parts.reduce((sum, p) => sum + p.sets, 0)
+  const todayVolume = parts.reduce((sum, p) => sum + (p.todayVolume ?? 0), 0)
+
+  const score =
+    volume > 0
+      ? Math.round(parts.reduce((sum, p) => sum + p.score * p.volume, 0) / volume)
+      : 0
+
+  const tier = getStrengthTier(score, volume)
+
+  return {
+    id: regionId,
+    label: regionDef.label,
+    volume,
+    sets,
+    todayVolume,
+    score: tier.score,
+    tier: tier.tier,
+    tierLabel: tier.label,
+    color: tier.color,
+    subMuscleIds: regionDef.subMuscleIds,
+  }
+}
+
+export function getRegionDisplayTip(muscle) {
+  if (!muscle) return 'Keep logging sets to unlock personalized cues.'
+  if (muscle.volume <= 0) {
+    return `No volume in 30 days for ${muscle.label}. Add 2–3 hard sets this week (RPE 7–8).`
+  }
+  if (muscle.tier === 'neglected' || muscle.tier === 'intermediate') {
+    return `${muscle.label} needs more work — add 2–4 weekly sets with controlled reps.`
+  }
+  if (muscle.tier === 'strong') {
+    return `${muscle.label} is developing well. Progress load when sets hit target reps.`
+  }
+  return `${muscle.label} is elite tier. Maintain or chase a new PR.`
+}
+
 export function getMuscleTip(subMuscle, sessions) {
   const m = typeof subMuscle === 'string' ? SUB_MUSCLE_BY_ID[subMuscle] : subMuscle
   if (!m) return 'Keep logging sets to unlock personalized cues.'

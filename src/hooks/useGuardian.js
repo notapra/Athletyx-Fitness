@@ -1,3 +1,8 @@
+/**
+ * React hook: bundles analysis + goal contract + Guardian status for AI pages.
+ * Memoizes runFullAnalysis to avoid recomputing features on unrelated renders.
+ */
+
 import { useMemo, useCallback } from 'react'
 import { useAuth } from './useAuth.js'
 import { useApp } from './useApp.js'

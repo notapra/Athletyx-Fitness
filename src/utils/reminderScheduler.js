@@ -1,3 +1,10 @@
+/**
+ * Proactive alignment reminders — rate-limited "agent nudges" (not LLM-generated).
+ *
+ * Caps (maxPerDay, cooldowns) prevent notification fatigue; mirrors production
+ * push/email throttling for any future LLM-drafted reminder copy.
+ */
+
 import { parseGuardianPrefs } from './goalContract.js'
 import { toDayKey } from './date.js'
 

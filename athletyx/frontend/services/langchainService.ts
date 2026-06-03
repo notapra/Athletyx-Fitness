@@ -1,3 +1,17 @@
+/**
+ * Athletyx LangChain agent — production-style ReAct loop (LangChain v1 createAgent).
+ *
+ * Stack:
+ * - System prompt: domain constraints (hypertrophy science, RPE/RIR, safety).
+ * - Tools: query_science_database (RAG placeholder → vector DB in prod).
+ * - Model: gpt-4o-mini via @langchain/openai (cost/latency tradeoff for chat).
+ *
+ * Interview talking points:
+ * - ReAct: model may call tools, observe JSON, then synthesize a grounded answer.
+ * - Temperature 0.35: slightly creative phrasing, still factual.
+ * - History window: last 12 turns to bound token cost.
+ */
+
 import { createAgent } from "langchain";
 import { ChatOpenAI } from "@langchain/openai";
 import { DynamicTool } from "@langchain/core/tools";
@@ -36,7 +50,10 @@ Your reasoning should align with evidence-based educators (e.g., Jeff Nippard, M
 - Include actionable sets/reps/RPE when prescribing.
 - End with one concrete next step when appropriate.`;
 
-/** Simulated indexed transcript / paper library (replace with real vector store later). */
+/**
+ * Mock retrieval corpus — simulates chunked transcript index + keyword scoring.
+ * Production: embed chunks (OpenAI/Cohere), store in pgvector/Pinecone, hybrid search.
+ */
 const SCIENCE_LIBRARY: Array<{
   id: string;
   source: string;
@@ -94,6 +111,7 @@ const SCIENCE_LIBRARY: Array<{
   },
 ];
 
+/** Lightweight lexical ranker — stand-in for dense retrieval + reranker. */
 function scoreHit(query: string, entry: (typeof SCIENCE_LIBRARY)[0]): number {
   const q = query.toLowerCase();
   let score = 0;
@@ -147,7 +165,10 @@ async function simulateScienceQuery(rawQuery: string): Promise<string> {
   });
 }
 
-/** LangChain DynamicTool — simulates RAG over a science transcript library. */
+/**
+ * Agent tool: RAG retrieval step. LLM chooses when to call based on description + user question.
+ * Returns JSON string so the model can cite excerpts without fabricating papers.
+ */
 export const queryScienceDatabaseTool = new DynamicTool({
   name: "query_science_database",
   description:
@@ -172,6 +193,7 @@ function getChatModel(): ChatOpenAI {
 
 type AgentInstance = ReturnType<typeof createAgent>;
 
+// Singleton agent — avoid re-instantiating graph + model client per request (serverless: use caution)
 let agentPromise: Promise<AgentInstance> | null = null;
 
 function getAgent(): Promise<AgentInstance> {

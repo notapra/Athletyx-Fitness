@@ -1,46 +1,97 @@
-export const BODY_VIEWBOX = '0 0 200 420'
+/** Simplified muscle map — fewer regions, human-like silhouette. Analytics still use sub-muscle IDs under the hood. */
 
+export const BODY_VIEWBOX = '0 0 200 400'
+
+/** Stylized front figure: head, neck, shoulders, tapered waist, legs with knees. */
 export const FRONT_BODY_OUTLINE =
-  'M100 8 C88 8 82 18 82 28 L82 38 C72 42 58 48 52 58 L48 72 L44 95 L42 120 L40 145 L38 175 L36 210 L34 250 L32 290 L30 330 L28 370 L26 400 L74 400 L76 370 L78 330 L80 290 L82 250 L84 210 L86 175 L88 145 L90 120 L92 95 L96 72 L100 58 L104 72 L108 95 L110 120 L112 145 L114 175 L116 210 L118 250 L120 290 L122 330 L124 370 L126 400 L174 400 L172 370 L170 330 L168 290 L166 250 L164 210 L162 175 L160 145 L158 120 L156 95 L152 72 L148 58 C142 48 128 42 118 38 L118 28 C118 18 112 8 100 8 Z'
+  'M 100 8 C 81 8 69 22 69 37 C 69 50 78 58 88 61 L 86 70 C 66 74 48 88 40 108 C 34 124 32 142 34 162 C 36 178 42 186 48 188 L 44 228 L 42 288 L 44 348 L 48 392 L 66 392 L 68 348 L 70 288 L 74 228 L 80 182 L 86 152 L 92 128 L 96 118 L 100 114 L 104 118 L 108 128 L 114 152 L 120 182 L 126 228 L 130 288 L 132 348 L 134 392 L 152 392 L 156 348 L 158 288 L 156 228 L 152 188 C 158 186 164 178 166 162 C 168 142 166 124 160 108 C 152 88 134 74 114 70 L 112 61 C 122 58 131 50 131 37 C 131 22 119 8 100 8 Z'
 
-export const BACK_BODY_OUTLINE =
-  'M100 8 C88 8 82 18 82 28 L82 38 C72 42 58 48 52 58 L48 72 L44 95 L42 120 L40 145 L38 175 L36 210 L34 250 L32 290 L30 330 L28 370 L26 400 L74 400 L76 370 L78 330 L80 290 L82 250 L84 210 L86 175 L88 145 L90 120 L92 95 L96 72 L100 58 L104 72 L108 95 L110 120 L112 145 L114 175 L116 210 L118 250 L120 290 L122 330 L124 370 L126 400 L174 400 L172 370 L170 330 L168 290 L166 250 L164 210 L162 175 L160 145 L158 120 L156 95 L152 72 L148 58 C142 48 128 42 118 38 L118 28 C118 18 112 8 100 8 Z'
+/** Back view — same silhouette; muscle overlays differ. */
+export const BACK_BODY_OUTLINE = FRONT_BODY_OUTLINE
 
-export const FRONT_PATHS = {
-  pec_upper: 'M72 88 L100 82 L128 88 L125 108 L100 115 L75 108 Z',
-  pec_lower: 'M75 108 L100 115 L125 108 L122 128 L100 135 L78 128 Z',
-  deltoid_anterior: 'M52 72 L72 78 L75 108 L55 105 L48 88 Z M128 72 L148 88 L152 105 L132 108 L135 78 Z',
-  deltoid_lateral: 'M48 88 L55 105 L52 125 L42 115 L44 95 Z M152 105 L148 88 L156 95 L158 115 L148 125 Z',
-  biceps_long: 'M42 115 L52 125 L50 155 L38 150 L36 130 Z M158 115 L164 130 L162 150 L150 155 L148 125 Z',
-  biceps_short: 'M38 130 L50 155 L48 175 L34 168 L32 148 Z M162 130 L168 148 L166 168 L152 175 L150 155 Z',
-  brachialis: 'M34 148 L48 175 L44 195 L30 188 L28 168 Z M168 148 L172 168 L170 188 L156 195 L152 175 Z',
-  rectus_femoris: 'M78 210 L100 205 L122 210 L120 280 L100 285 L80 280 Z',
-  vastus_lateralis: 'M52 250 L78 210 L80 280 L70 340 L55 330 Z M148 250 L122 210 L120 280 L130 340 L145 330 Z',
-  vastus_medialis: 'M80 280 L100 285 L120 280 L118 340 L100 345 L82 340 Z',
-  core_rectus: 'M88 145 L112 145 L110 200 L100 205 L90 200 Z',
-  core_obliques: 'M76 145 L88 145 L90 200 L78 210 L72 175 Z M112 145 L124 145 L128 175 L122 210 L110 200 Z',
+/**
+ * Map region id → { label, subMuscleIds, path }
+ * Fewer clickable areas; scores are volume-weighted averages of sub-muscles.
+ */
+export const FRONT_REGIONS = {
+  shoulders: {
+    label: 'Shoulders',
+    subMuscleIds: ['deltoid_anterior', 'deltoid_lateral'],
+    path:
+      'M 40 108 C 48 88 66 74 86 70 L 92 98 L 52 112 Z M 160 108 C 152 88 134 74 114 70 L 108 98 L 148 112 Z',
+  },
+  chest: {
+    label: 'Chest',
+    subMuscleIds: ['pec_upper', 'pec_lower'],
+    path: 'M 68 98 C 84 92 100 90 116 98 L 122 128 C 100 136 78 128 68 128 Z',
+  },
+  arms: {
+    label: 'Arms',
+    subMuscleIds: ['biceps_long', 'biceps_short', 'brachialis'],
+    path:
+      'M 34 162 C 36 142 40 124 48 112 L 52 112 L 56 168 L 52 218 L 44 208 L 38 182 Z M 166 162 C 164 142 160 124 152 112 L 148 112 L 144 168 L 148 218 L 156 208 L 162 182 Z',
+  },
+  core: {
+    label: 'Core',
+    subMuscleIds: ['core_rectus', 'core_obliques'],
+    path: 'M 72 128 L 128 128 L 124 182 C 100 190 76 182 72 182 Z',
+  },
+  legs: {
+    label: 'Legs (quads)',
+    subMuscleIds: ['rectus_femoris', 'vastus_lateralis', 'vastus_medialis'],
+    path:
+      'M 74 182 L 126 182 L 130 288 L 132 348 L 134 392 L 104 392 L 100 280 L 96 392 L 66 392 L 68 348 L 70 288 Z',
+  },
 }
 
-export const BACK_PATHS = {
-  deltoid_posterior: 'M52 72 L72 78 L75 98 L55 95 L48 82 Z M128 72 L148 82 L152 95 L132 98 L135 78 Z',
-  triceps_lateral: 'M36 130 L48 125 L52 155 L40 158 L34 148 Z M164 130 L168 148 L160 158 L148 155 L152 125 Z',
-  triceps_long: 'M40 158 L52 155 L54 185 L42 188 L38 168 Z M160 158 L162 168 L158 188 L146 185 L148 155 Z',
-  triceps_medial: 'M42 188 L54 185 L52 205 L40 200 L38 180 Z M158 188 L162 180 L160 200 L148 205 L146 185 Z',
-  lats: 'M55 95 L75 98 L78 175 L58 168 L52 125 Z M125 98 L145 95 L148 125 L142 168 L122 175 Z',
-  rhomboids: 'M78 98 L122 98 L118 130 L100 135 L82 130 Z',
-  traps_upper: 'M82 38 L118 38 L125 72 L100 78 L75 72 Z',
-  traps_lower: 'M82 130 L118 130 L115 155 L100 160 L85 155 Z',
-  hamstrings_biceps_femoris: 'M55 330 L78 280 L80 340 L70 395 L52 385 Z M145 330 L122 280 L120 340 L130 395 L148 385 Z',
-  hamstrings_semitendinosus: 'M70 340 L82 340 L80 395 L65 400 L58 360 Z M130 340 L118 340 L120 395 L135 400 L142 360 Z',
-  glutes: 'M72 210 L100 205 L128 210 L125 250 L100 255 L75 250 Z',
-  gastrocnemius: 'M58 360 L78 340 L82 400 L65 405 L55 385 Z M142 360 L122 340 L118 400 L135 405 L145 385 Z',
-  soleus: 'M65 400 L82 400 L80 415 L68 418 L62 408 Z M135 400 L118 400 L120 415 L132 418 L138 408 Z',
+export const BACK_REGIONS = {
+  shoulders: {
+    label: 'Shoulders',
+    subMuscleIds: ['deltoid_posterior'],
+    path:
+      'M 40 108 C 48 88 66 74 86 70 L 92 98 L 52 112 Z M 160 108 C 152 88 134 74 114 70 L 108 98 L 148 112 Z',
+  },
+  back: {
+    label: 'Back',
+    subMuscleIds: ['lats', 'rhomboids', 'traps_upper', 'traps_lower'],
+    path: 'M 52 98 L 148 98 L 142 182 C 100 192 58 182 52 182 Z',
+  },
+  arms: {
+    label: 'Arms',
+    subMuscleIds: ['triceps_lateral', 'triceps_long', 'triceps_medial'],
+    path:
+      'M 34 162 C 36 142 40 124 48 112 L 52 112 L 56 168 L 52 218 L 44 208 L 38 182 Z M 166 162 C 164 142 160 124 152 112 L 148 112 L 144 168 L 148 218 L 156 208 L 162 182 Z',
+  },
+  glutes: {
+    label: 'Glutes',
+    subMuscleIds: ['glutes'],
+    path: 'M 72 182 L 128 182 L 124 228 C 100 236 76 228 72 228 Z',
+  },
+  legs: {
+    label: 'Legs',
+    subMuscleIds: [
+      'hamstrings_biceps_femoris',
+      'hamstrings_semitendinosus',
+      'gastrocnemius',
+      'soleus',
+    ],
+    path:
+      'M 74 228 L 126 228 L 130 288 L 132 348 L 134 392 L 104 392 L 100 280 L 96 392 L 66 392 L 68 348 L 70 288 Z',
+  },
 }
 
+export function getRegionsForView(view) {
+  return view === 'back' ? BACK_REGIONS : FRONT_REGIONS
+}
+
+/** @deprecated Use getRegionsForView — kept for any legacy imports */
 export function getPathsForView(view) {
-  return view === 'back' ? BACK_PATHS : FRONT_PATHS
+  const regions = getRegionsForView(view)
+  return Object.fromEntries(
+    Object.entries(regions).map(([id, r]) => [id, r.path])
+  )
 }
 
 export function getMuscleIdsForView(view) {
-  return Object.keys(getPathsForView(view))
+  return Object.keys(getRegionsForView(view))
 }

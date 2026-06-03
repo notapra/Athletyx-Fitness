@@ -1,3 +1,10 @@
+"""
+Athletyx HTTP API — thin transport layer over agent.route_message().
+
+AI note: keeps inference/routing off the client; enables CORS for Next.js chat UI
+and a future swap to streaming (SSE) without changing tool implementations.
+"""
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
@@ -36,5 +43,6 @@ def health():
 
 @app.post("/api/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest):
+    # Pydantic validates length; router returns structured tool metadata for debugging/UI badges
     result = route_message(request.message)
     return ChatResponse(**result)

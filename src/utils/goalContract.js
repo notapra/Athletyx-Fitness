@@ -1,3 +1,12 @@
+/**
+ * Goal Contract — structured user intent for prompts and drift detection.
+ *
+ * Single source of truth built from profile.fitness_goal + active goals + constraints.
+ * Keywords power both:
+ * - Prompt injection (what the coach must respect)
+ * - Guardian classifyUserMessage / countGoalKeywords (offline alignment checks)
+ */
+
 const TRAINING_KEYWORDS = [
   'workout', 'train', 'lift', 'gym', 'exercise', 'set', 'rep', 'weight', 'bench',
   'squat', 'deadlift', 'press', 'pull', 'push', 'leg', 'muscle', 'hypertrophy',
@@ -27,6 +36,7 @@ export function parseGuardianPrefs(notificationPreferences) {
   }
 }
 
+/** Normalize profile + goals into a contract object consumed by prompts and Guardian. */
 export function buildGoalContract(profile, goals = [], sessions = []) {
   const activeGoals = (goals ?? []).filter((g) => !g.completed)
   const primaryGoal = String(profile?.fitness_goal ?? '').trim()

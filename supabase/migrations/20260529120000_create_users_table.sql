@@ -1,5 +1,10 @@
 -- Athletyx: public.users — core identity store with immutable user_id
 -- Apply via: supabase db reset | supabase migration up | SQL Editor (remote)
+--
+-- AI / data layer (interview):
+-- - Immutable user_id: stable join key for chat history, embeddings, and eval traces across renames.
+-- - Separate from auth.users / profiles (IronLog) — enables Athletyx agent identity without coupling.
+-- - MCP: inspect via .cursor/mcp.json → athletyx-postgres-storage (read-only queries on local :54322).
 
 -- ---------------------------------------------------------------------------
 -- Extensions

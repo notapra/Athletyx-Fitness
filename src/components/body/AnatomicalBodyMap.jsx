@@ -4,27 +4,42 @@ import {
   BACK_BODY_OUTLINE,
   BODY_VIEWBOX,
   FRONT_BODY_OUTLINE,
-  getPathsForView,
+  getRegionsForView,
 } from './bodyPaths.js'
-import { TIER_COLORS } from '../../utils/subMuscleAnalytics.js'
+import {
+  TIER_COLORS,
+  aggregateRegionMuscle,
+} from '../../utils/subMuscleAnalytics.js'
 import MuscleTooltip from './MuscleTooltip.jsx'
 import { useApp } from '../../hooks/useApp.js'
 
 const LEGEND = [
-  { tier: 'neglected', label: 'Needs improvement', color: TIER_COLORS.neglected },
-  { tier: 'intermediate', label: 'Intermediate', color: TIER_COLORS.intermediate },
+  { tier: 'neglected', label: 'Needs work', color: TIER_COLORS.neglected },
+  { tier: 'intermediate', label: 'Building', color: TIER_COLORS.intermediate },
   { tier: 'strong', label: 'Strong', color: TIER_COLORS.strong },
   { tier: 'elite', label: 'Elite', color: TIER_COLORS.elite },
 ]
 
-export default function AnatomicalBodyMap({ muscles, muscleById }) {
+/** Head overlay — separate from muscle regions for a more human read. */
+const HEAD_PATH =
+  'M 100 8 C 81 8 69 22 69 37 C 69 50 78 58 88 61 L 112 61 C 122 58 131 50 131 37 C 131 22 119 8 100 8 Z'
+
+export default function AnatomicalBodyMap({ muscles: _muscles, muscleById }) {
   const { sessions } = useApp()
   const [view, setView] = useState('front')
   const [activeId, setActiveId] = useState(null)
   const [tooltipPos, setTooltipPos] = useState(null)
 
-  const paths = useMemo(() => getPathsForView(view), [view])
+  const regions = useMemo(() => getRegionsForView(view), [view])
   const outline = view === 'back' ? BACK_BODY_OUTLINE : FRONT_BODY_OUTLINE
+
+  const regionData = useMemo(() => {
+    const map = {}
+    for (const [id, def] of Object.entries(regions)) {
+      map[id] = aggregateRegionMuscle(id, def, muscleById)
+    }
+    return map
+  }, [regions, muscleById])
 
   const handleMuscleEnter = useCallback((id, e) => {
     setActiveId(id)
@@ -43,11 +58,11 @@ export default function AnatomicalBodyMap({ muscles, muscleById }) {
     setTooltipPos(null)
   }, [])
 
-  const activeMuscle = activeId ? muscleById[activeId] : null
+  const activeMuscle = activeId ? regionData[activeId] : null
 
   return (
     <div className="relative">
-      <div className="mb-4 flex rounded-2xl border border-zinc-800 bg-zinc-900/50 p-1">
+      <div className="mb-3 flex rounded-2xl border border-zinc-800 bg-zinc-900/50 p-1">
         {['front', 'back'].map((v) => (
           <button
             key={v}
@@ -67,39 +82,41 @@ export default function AnatomicalBodyMap({ muscles, muscleById }) {
         ))}
       </div>
 
-      <div className="relative mx-auto max-w-[220px]">
+      <div className="relative mx-auto max-w-[240px]">
         <svg
           viewBox={BODY_VIEWBOX}
-          className="h-auto w-full"
+          className="h-auto w-full drop-shadow-lg"
           role="img"
           aria-label={`${view} body muscle development map`}
         >
           <path
             d={outline}
-            fill="#18181b"
-            stroke="#3f3f46"
-            strokeWidth="1.5"
-            opacity="0.9"
+            fill="#141416"
+            stroke="#52525b"
+            strokeWidth="1.25"
+            strokeLinejoin="round"
           />
-          {Object.entries(paths).map(([id, d]) => {
-            const data = muscleById[id]
+          <path d={HEAD_PATH} fill="#1c1c1f" stroke="#52525b" strokeWidth="1" />
+
+          {Object.entries(regions).map(([id, def]) => {
+            const data = regionData[id]
             const fill = data?.color ?? TIER_COLORS.neglected
             const isActive = activeId === id
             return (
               <motion.path
                 key={id}
-                d={d}
+                d={def.path}
                 fill={fill}
-                fillOpacity={isActive ? 0.95 : 0.82}
-                stroke={isActive ? '#fff' : '#27272a'}
-                strokeWidth={isActive ? 1.5 : 0.75}
-                className="cursor-pointer transition-colors"
-                aria-label={data?.label ?? id}
+                fillOpacity={isActive ? 0.92 : 0.78}
+                stroke={isActive ? '#fafafa' : '#3f3f46'}
+                strokeWidth={isActive ? 1.25 : 0.6}
+                strokeLinejoin="round"
+                className="cursor-pointer"
+                aria-label={def.label}
                 onMouseEnter={(e) => handleMuscleEnter(id, e)}
                 onMouseLeave={handleMuscleLeave}
                 onClick={(e) => handleMuscleEnter(id, e)}
-                whileHover={{ scale: 1.02 }}
-                style={{ transformOrigin: 'center' }}
+                whileHover={{ fillOpacity: 0.9 }}
               />
             )
           })}
@@ -110,7 +127,7 @@ export default function AnatomicalBodyMap({ muscles, muscleById }) {
         ) : null}
       </div>
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {LEGEND.map((item) => (
           <div
             key={item.tier}

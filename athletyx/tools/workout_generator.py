@@ -1,3 +1,12 @@
+"""
+Structured program generation tool — template library keyed by (goal, split).
+
+AI engineer notes:
+- Enum-constrained parameters in workout_tool_schema reduce hallucinated tool args.
+- Returns markdown (rich output) from minimal inputs (goal + split).
+- Replace MOCK_ROUTINES with retrieval over user history / periodization rules later.
+"""
+
 MOCK_ROUTINES = {
     "hypertrophy": {
         "push": """## Hypertrophy · Push

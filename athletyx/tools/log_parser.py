@@ -1,5 +1,15 @@
+"""
+NL → structured workout confirmation tool (no LLM required).
+
+AI engineer notes:
+- log_tool_schema: exposed to future LLM function-calling / eval harnesses.
+- parse_raw_workout_log: regex + aliases — deterministic, unit-testable extraction.
+- Production path: same interface backed by an LLM with JSON schema or a fine-tuned parser.
+"""
+
 import re
 
+# OpenAI-compatible tool definition — bind to model for autonomous tool selection
 log_tool_schema = {
     "type": "function",
     "function": {

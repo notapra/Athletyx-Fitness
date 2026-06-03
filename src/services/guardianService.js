@@ -1,3 +1,14 @@
+/**
+ * Goal Guardian — supervisor / guardrail layer on top of IronCoach.
+ *
+ * Pattern: **generate → critique → (optional) correct** (lighter than full re-generation).
+ * - Pre-generation: goal contract injected in aiPrompts.buildSystemContext (not here).
+ * - Post-generation: scoreDrift() heuristic judge (no LLM cost; LLM judge is Phase D).
+ * - Proactive: capped reminders via reminderScheduler (alignment nudges, not spam).
+ *
+ * Analogous to: constitutional AI, output validators, or a secondary "critic" agent.
+ */
+
 import {
   scoreDrift,
   buildGoalFocusedCorrection,
@@ -51,6 +62,7 @@ export function logGuardianReminder() {
   /* local-only: reminder state in reminderScheduler */
 }
 
+/** Post-response guardrail — returns enriched payload for chat UI badges and logging. */
 export function reviewCoachReply({ reply, userMessage, contract, chatHistory, sessions, userId }) {
   const result = scoreDrift({
     reply,
@@ -64,6 +76,7 @@ export function reviewCoachReply({ reply, userMessage, contract, chatHistory, se
   let guardianNote = null
   let warningLevel = null
 
+  // Thresholds aligned with guardianAnalysis: <30 pass, 30–60 warn, >60 append correction
   if (result.level === 'high') {
     finalReply = reply + buildGoalFocusedCorrection(contract, result.reasons)
     guardianNote = result.reasons.join('. ')

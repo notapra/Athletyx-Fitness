@@ -65,7 +65,7 @@ export default function Home({ onStartWorkout }) {
       <section>
         <h2 className="mb-1 text-sm font-semibold text-white">Muscle development map</h2>
         <p className="mb-3 text-xs text-zinc-500">
-          Tap a region for strength tier, volume, and AI cues.
+          Tap a muscle group for your strength tier and training tips.
         </p>
         <Card className="!p-4">
           <AnatomicalBodyMap muscles={muscles} muscleById={muscleById} />

@@ -1,3 +1,10 @@
+/**
+ * IronCoach chat UI — wires user messages into sendChatMessage() pipeline.
+ *
+ * Flow: analysis (from parent) + goal contract → sendChatMessage → Guardian metadata on bubbles.
+ * "Refocus on my goals" bypasses generation with buildRefocusedReply (explicit user correction signal).
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Send, Sparkles, Trash2, Target } from 'lucide-react'

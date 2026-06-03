@@ -1,3 +1,15 @@
+"""
+Athletyx agent router — Phase 1 (deterministic intent routing).
+
+AI architecture (interview framing):
+- **Tool registry**: TOOL_MAPPER maps OpenAI-style function names → Python callables.
+- **Router**: rule-based NLU (regex/heuristics), not an LLM — cheap, testable, no API cost.
+- **Phase 2 swap**: replace route_message() with an LLM that chooses tools via function-calling
+  while keeping execute_tool() and ALL_ATHLETYX_TOOLS schemas unchanged.
+
+Response shape mirrors chat APIs: { role, content, tool_used, tool_args } for observability.
+"""
+
 import re
 from typing import Any
 
@@ -5,6 +17,7 @@ from tools import TOOL_MAPPER
 
 
 def execute_tool(name: str, arguments: dict[str, Any]) -> str:
+    """Dispatch a tool by name. Single choke point for logging, auth, and rate limits later."""
     fn = TOOL_MAPPER.get(name)
     if fn is None:
         return f"Unknown tool: **{name}**"
@@ -18,6 +31,7 @@ def execute_tool(name: str, arguments: dict[str, Any]) -> str:
 
 
 def _looks_like_log(text: str) -> bool:
+    """Heuristic: natural-language set logging (e.g. 'hit bench 225 for 8, 8, 6')."""
     lower = text.lower()
     has_lift_word = bool(
         re.search(r"\b(bench|squat|deadlift|press|row|curl|hit|logged|dl|rdl)\b", lower)
@@ -28,6 +42,7 @@ def _looks_like_log(text: str) -> bool:
 
 
 def _detect_workout_intent(text: str) -> tuple[str, str] | None:
+    """Extract (fitness_goal, split) for generate_workout_routine tool args."""
     lower = text.lower()
     if not re.search(r"\b(workout|routine|plan|program|session)\b", lower):
         return None
@@ -49,6 +64,12 @@ def _detect_workout_intent(text: str) -> tuple[str, str] | None:
 
 
 def route_message(user_text: str) -> dict[str, Any]:
+    """
+    Main entry: user utterance → optional tool call → assistant message.
+
+    Priority order (explicit for tests and future LLM tool-choice prompts):
+    1. Workout log parse  2. Routine generation  3. Help / fallback
+    """
     text = (user_text or "").strip()
     if not text:
         return {

@@ -1,9 +1,19 @@
+/**
+ * Prompt templates for IronCoach — static system context + user turn.
+ *
+ * AI engineer notes:
+ * - This is "context engineering": compress session analytics into a system block.
+ * - contractToPromptBlock = hard constraints (goal contract) to reduce hallucinated off-goal advice.
+ * - For production: version prompts, A/B test, log token counts; consider JSON schema outputs.
+ */
+
 import { contractToPromptBlock } from './goalContract.js'
 
 export function buildGuardianConstraints(contract) {
   return contractToPromptBlock(contract)
 }
 
+/** Assembles the system message: persona + goal contract + numeric features from runFullAnalysis(). */
 export function buildSystemContext(analysis, contract = null) {
   const { recovery, intensity, muscle, progression, stats } = analysis
 

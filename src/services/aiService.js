@@ -1,3 +1,15 @@
+/**
+ * IronCoach — client-side coaching pipeline (offline-first).
+ *
+ * Architecture (AI engineer interview):
+ * 1. **Context assembly**: runFullAnalysis(sessions) → structured metrics (RAG-like, but deterministic).
+ * 2. **Prompting**: buildChatPrompt injects goal contract + training stats into system context.
+ * 3. **Generation**: default = keyword router (no API); optional OpenAI path when useApi + keys set.
+ * 4. **Guardrails**: reviewCoachReply() post-processes draft for goal drift (supervisor pattern).
+ *
+ * Tradeoff: zero latency/cost offline vs Athletyx server agent (LangChain + tools) for deep reasoning.
+ */
+
 import { buildChatPrompt } from '../utils/aiPrompts.js'
 import { reviewCoachReply, buildRefocusedReply } from './guardianService.js'
 
@@ -51,6 +63,10 @@ function matchKeywords(text, words) {
   return words.some((w) => lower.includes(w))
 }
 
+/**
+ * Phase-1 "router": intent buckets via keyword match over precomputed analysis.
+ * Replace with embeddings + classifier or LLM function-calling while keeping analysis input.
+ */
 function generateCoachResponse(userMessage, analysis, contract) {
   const msg = userMessage.toLowerCase()
   const { recovery, progression, muscle, intensity, stats } = analysis
@@ -102,6 +118,9 @@ function generateCoachResponse(userMessage, analysis, contract) {
   return `Based on your last 30 days (${stats.totalWorkouts} sessions): ${topProgression?.message ?? ''} ${topRecovery?.message ?? ''} ${contract?.primaryGoal ? `Primary goal: ${contract.primaryGoal}.` : ''} Ask me about bench, legs, protein, or what to train today.`
 }
 
+/**
+ * End-to-end chat turn: optional LLM → draft → Guardian review → { content, driftScore, ... }.
+ */
 export async function sendChatMessage(userMessage, analysis, options = {}) {
   const {
     useApi = false,
@@ -125,6 +144,7 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
 
   let draft
 
+  // OpenAI-compatible chat completions — system prompt carries full user analytics context
   if (useApi && apiEndpoint && apiKey) {
     const prompt = buildChatPrompt(userMessage, analysis, contract)
     const response = await fetch(apiEndpoint, {
@@ -145,6 +165,7 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     const data = await response.json()
     draft = data.choices?.[0]?.message?.content ?? 'No response received.'
   } else {
+    // Simulated latency so UX feels like a model call during demos without API keys
     await delay(800 + Math.random() * 700)
     draft = generateCoachResponse(userMessage, analysis, contract)
   }
@@ -153,6 +174,7 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     return { content: draft, driftScore: 0, guardianNote: null, warningLevel: null }
   }
 
+  // Supervisor layer: score drift vs goal contract before returning to UI
   return reviewCoachReply({
     reply: draft,
     userMessage,
