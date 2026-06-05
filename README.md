@@ -4,7 +4,7 @@ Premium fitness tracking — **minimal inputs, rich outputs**.
 
 IronLog (React + Vite) is the main workout app: sessions, PRs, analytics, Dynamic Island muscle tracking, and AI coaching. The `athletyx/` folder adds a conversational Python + Next.js shell for future natural-language logging and program generation.
 
-## AI architecture (interview prep)
+## AI architecture 
 
 See **[docs/ai-engineer-interview.md](docs/ai-engineer-interview.md)** — file map for IronCoach, Goal Guardian, LangChain agent, and tools.
 
