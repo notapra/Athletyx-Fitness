@@ -1,0 +1,10 @@
+[
+  {"name": "Bench Press", "muscleGroup": "Chest", "equipment": "Barbell", "category": "compound", "movementType": "push"},
+  {"name": "Incline Bench Press", "muscleGroup": "Chest", "equipment": "Barbell", "category": "compound", "movementType": "push"},
+  {"name": "Overhead Press", "muscleGroup": "Shoulders", "equipment": "Barbell", "category": "compound", "movementType": "push"},
+  {"name": "Pull-Up", "muscleGroup": "Back", "equipment": "Bodyweight", "category": "compound", "movementType": "pull"},
+  {"name": "Barbell Row", "muscleGroup": "Back", "equipment": "Barbell", "category": "compound", "movementType": "pull"},
+  {"name": "Squat", "muscleGroup": "Quads", "equipment": "Barbell", "category": "compound", "movementType": "legs"},
+  {"name": "Romanian Deadlift", "muscleGroup": "Hamstrings", "equipment": "Barbell", "category": "compound", "movementType": "legs"},
+  {"name": "Deadlift", "muscleGroup": "Back", "equipment": "Barbell", "category": "compound", "movementType": "legs"}
+]

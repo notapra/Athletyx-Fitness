@@ -8,6 +8,8 @@ IronLog (React + Vite) is the main workout app: sessions, PRs, analytics, Dynami
 
 See **[docs/ai-engineer-interview.md](docs/ai-engineer-interview.md)** — file map for IronCoach, Goal Guardian, LangChain agent, and tools.
 
+**MCP (app-store spec):** **[docs/athletyx-mcp-app-store-spec.md](docs/athletyx-mcp-app-store-spec.md)** — tools, resources, prompts for `athletyx.mcp/`.
+
 ## Database (Supabase / PostgreSQL)
 
 - Migrations: [`supabase/migrations/`](supabase/migrations/) — includes `public.users` with immutable `user_id`
