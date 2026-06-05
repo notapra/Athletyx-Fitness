@@ -1,0 +1,24 @@
+# Local Postgres for athletyx.mcp (no Homebrew required).
+# Install Docker Desktop: https://www.docker.com/products/docker-desktop/
+# Then: docker compose up -d
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: athletyx-mcp-postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - athletyx_mcp_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  athletyx_mcp_pgdata:

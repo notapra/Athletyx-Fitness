@@ -1,5 +1,18 @@
 {
   "mcpServers": {
+    "athletyx-user-data": {
+      "command": "python3",
+      "args": [
+        "/Users/aprajitvijay/projects/Athletyx-Fitness/athletyx.mcp/server.py"
+      ],
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_PORT": "5432",
+        "DB_NAME": "postgres",
+        "DB_USER": "postgres",
+        "DB_PASSWORD": "postgres"
+      }
+    },
     "athletyx-postgres-storage": {
       "command": "npx",
       "args": [
