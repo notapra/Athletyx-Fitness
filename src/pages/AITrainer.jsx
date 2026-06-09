@@ -75,6 +75,10 @@ export default function AITrainer() {
                 AI Personal Trainer
               </p>
               <h1 className="text-xl font-bold text-white">IronCoach</h1>
+              <p className="text-[10px] text-cyan-400/90">
+                Powered by <span className="font-semibold text-cyan-300">Athletyx</span> — personalized
+                RAG + DuckDuckGo citations
+              </p>
             </div>
           </div>
           <p className="mt-3 text-lg font-semibold text-white">{headline.title}</p>

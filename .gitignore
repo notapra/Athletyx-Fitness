@@ -16,6 +16,11 @@ dist-ssr
 !.env.example
 !.env.local.example
 
+# Local secrets — API keys must stay out of the public repo
+PRIVATE.env
+athletyx.mcp/.env
+**/uploads/*.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

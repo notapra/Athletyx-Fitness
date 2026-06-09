@@ -91,7 +91,18 @@ export function getDefaultProfile() {
     experience_level: 'intermediate',
     units: 'lbs',
     dark_mode: true,
-    ai_preferences: { constraints: [] },
+    age: null,
+    ai_preferences: {
+      constraints: [],
+      personal_factors: {
+        max_effort_level: 'moderate',
+        injury_history: [],
+        movement_restrictions: [],
+        recovery_capacity: 'average',
+        medical_clearance: true,
+        notes: '',
+      },
+    },
     notification_preferences: { ...DEFAULT_GUARDIAN_PREFS },
   }
 }

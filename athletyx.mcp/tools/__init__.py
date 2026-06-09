@@ -1,6 +1,6 @@
 """Register all MCP tool domains on the FastMCP instance."""
 
-from tools import coaching, compliance, goals, identity, workouts
+from tools import coaching, compliance, goals, identity, research, workouts
 
 
 def register_all(mcp) -> None:
@@ -8,4 +8,5 @@ def register_all(mcp) -> None:
     workouts.register(mcp)
     goals.register(mcp)
     coaching.register(mcp)
+    research.register(mcp)
     compliance.register(mcp)

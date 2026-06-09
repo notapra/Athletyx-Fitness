@@ -12,6 +12,9 @@
 
 import { buildChatPrompt } from '../utils/aiPrompts.js'
 import { reviewCoachReply, buildRefocusedReply } from './guardianService.js'
+import { sendAthletyxCoachMessage, checkAthletyxHealth } from './athletyxService.js'
+import { loadProfile } from '../utils/storage.js'
+import { buildCitationsFromAthletyxResponse } from '../utils/athletyxCitations.js'
 
 const CHAT_STORAGE_KEY = 'gymtracker_ai_chat_v1'
 
@@ -131,6 +134,10 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     sessions = [],
     userId = null,
     refocusGoals = false,
+    profile = null,
+    goals = [],
+    useAthletyx = true,
+    onAthletyxStatus = null,
   } = options
 
   if (refocusGoals && contract) {
@@ -143,9 +150,44 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
   }
 
   let draft
+  let athletyxMeta = null
+
+  // Athletyx backend: RAG + SerpAPI + personalization (keys in PRIVATE.env on server)
+  if (useAthletyx) {
+    try {
+      onAthletyxStatus?.('Athletyx · checking connection…')
+      const apiUp = await checkAthletyxHealth()
+      if (apiUp) {
+        onAthletyxStatus?.('Athletyx · personalizing for your profile')
+        const userProfile = profile ?? loadProfile()
+        onAthletyxStatus?.('Athletyx · searching knowledge base (RAG)')
+        const ragTimer = setTimeout(() => {
+          onAthletyxStatus?.('Athletyx · searching DuckDuckGo')
+        }, 900)
+        const result = await sendAthletyxCoachMessage(userMessage, {
+          profile: userProfile,
+          goals,
+          analysis,
+        })
+        clearTimeout(ragTimer)
+        onAthletyxStatus?.('Athletyx · building your answer')
+        draft = result.content
+        athletyxMeta = {
+          poweredBy: result.powered_by ?? 'Athletyx',
+          citations: buildCitationsFromAthletyxResponse(result),
+          searchTrace: result.search_trace ?? {},
+          personalizationApplied: result.personalization_applied,
+        }
+      }
+    } catch {
+      /* fall through to offline / OpenAI paths */
+    } finally {
+      onAthletyxStatus?.(null)
+    }
+  }
 
   // OpenAI-compatible chat completions — system prompt carries full user analytics context
-  if (useApi && apiEndpoint && apiKey) {
+  if (!draft && useApi && apiEndpoint && apiKey) {
     const prompt = buildChatPrompt(userMessage, analysis, contract)
     const response = await fetch(apiEndpoint, {
       method: 'POST',
@@ -164,18 +206,26 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     if (!response.ok) throw new Error('AI API request failed')
     const data = await response.json()
     draft = data.choices?.[0]?.message?.content ?? 'No response received.'
-  } else {
+  } else if (!draft) {
     // Simulated latency so UX feels like a model call during demos without API keys
     await delay(800 + Math.random() * 700)
     draft = generateCoachResponse(userMessage, analysis, contract)
   }
 
+  const base = {
+    content: draft,
+    athletyxMeta,
+    driftScore: 0,
+    guardianNote: null,
+    warningLevel: null,
+  }
+
   if (!contract) {
-    return { content: draft, driftScore: 0, guardianNote: null, warningLevel: null }
+    return base
   }
 
   // Supervisor layer: score drift vs goal contract before returning to UI
-  return reviewCoachReply({
+  const reviewed = await reviewCoachReply({
     reply: draft,
     userMessage,
     contract,
@@ -183,4 +233,5 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     sessions,
     userId,
   })
+  return { ...reviewed, athletyxMeta }
 }

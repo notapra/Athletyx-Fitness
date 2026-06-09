@@ -1,8 +1,5 @@
 /**
- * IronCoach chat UI — wires user messages into sendChatMessage() pipeline.
- *
- * Flow: analysis (from parent) + goal contract → sendChatMessage → Guardian metadata on bubbles.
- * "Refocus on my goals" bypasses generation with buildRefocusedReply (explicit user correction signal).
+ * IronCoach chat UI — Athletyx RAG + DuckDuckGo with cited sources.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -12,15 +9,20 @@ import { sendChatMessage, getChatHistory, clearChatHistory, persistMessage } fro
 import { createId } from '../../utils/session.js'
 import { SUGGESTED_QUESTIONS } from '../../utils/aiPrompts.js'
 import { useApp } from '../../hooks/useApp.js'
+import { useAuth } from '../../hooks/useAuth.js'
 import { useGuardian } from '../../hooks/useGuardian.js'
 import { resetDriftWarningCount } from '../../services/guardianService.js'
+import AthletyxCitations from './AthletyxCitations.jsx'
+import AthletyxStatus from './AthletyxStatus.jsx'
 
 export default function AITrainerChat({ analysis }) {
-  const { userId, sessions } = useApp()
+  const { userId, sessions, goals } = useApp()
   const { contract } = useGuardian()
+  const { profile } = useAuth()
   const [messages, setMessages] = useState([{ id: 'welcome', role: 'assistant', content: 'Loading coach…' }])
   const [input, setInput] = useState('')
   const [isTyping, setIsTyping] = useState(false)
+  const [athletyxStatus, setAthletyxStatus] = useState(null)
   const [loaded, setLoaded] = useState(false)
   const scrollRef = useRef(null)
 
@@ -39,7 +41,7 @@ export default function AITrainerChat({ analysis }) {
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
-  }, [messages, isTyping])
+  }, [messages, isTyping, athletyxStatus])
 
   async function handleSend(text = input, refocus = false) {
     const trimmed = refocus ? 'Refocus on my goals' : text.trim()
@@ -53,6 +55,7 @@ export default function AITrainerChat({ analysis }) {
     }
 
     setIsTyping(true)
+    setAthletyxStatus(null)
 
     try {
       const history = messages.map((m) => ({ role: m.role, content: m.content }))
@@ -61,12 +64,16 @@ export default function AITrainerChat({ analysis }) {
         chatHistory: history,
         sessions,
         userId,
+        profile,
+        goals,
         refocusGoals: refocus,
+        onAthletyxStatus: setAthletyxStatus,
       })
 
       const content = typeof result === 'string' ? result : result.content
       const guardianNote = typeof result === 'object' ? result.guardianNote : null
       const warningLevel = typeof result === 'object' ? result.warningLevel : null
+      const athletyxMeta = typeof result === 'object' ? result.athletyxMeta : null
 
       const botMsg = {
         id: createId(),
@@ -74,6 +81,7 @@ export default function AITrainerChat({ analysis }) {
         content,
         guardianNote,
         warningLevel,
+        athletyxMeta,
       }
       setMessages((prev) => [...prev, botMsg])
       await persistMessage('assistant', content, userId)
@@ -86,6 +94,7 @@ export default function AITrainerChat({ analysis }) {
       ])
     } finally {
       setIsTyping(false)
+      setAthletyxStatus(null)
     }
   }
 
@@ -106,7 +115,9 @@ export default function AITrainerChat({ analysis }) {
           </div>
           <div>
             <p className="text-sm font-semibold text-white">IronCoach</p>
-            <p className="text-[10px] text-zinc-500">Monitored by Goal Guardian</p>
+            <p className="text-[10px] text-cyan-400/90">
+              Powered by <span className="font-semibold">Athletyx</span> · RAG + DuckDuckGo
+            </p>
           </div>
         </div>
         <button
@@ -128,6 +139,11 @@ export default function AITrainerChat({ analysis }) {
               animate={{ opacity: 1, y: 0 }}
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
+              {msg.role === 'assistant' && msg.athletyxMeta?.poweredBy ? (
+                <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-cyan-500/80">
+                  {msg.athletyxMeta.poweredBy}
+                </p>
+              ) : null}
               <div
                 className={`max-w-[88%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
                   msg.role === 'user'
@@ -137,6 +153,9 @@ export default function AITrainerChat({ analysis }) {
               >
                 {msg.content}
               </div>
+              {msg.athletyxMeta?.citations?.length ? (
+                <AthletyxCitations citations={msg.athletyxMeta.citations} />
+              ) : null}
               {msg.guardianNote ? (
                 <p
                   className={`mt-1 max-w-[88%] rounded-xl px-3 py-2 text-[11px] ${
@@ -152,7 +171,9 @@ export default function AITrainerChat({ analysis }) {
           ))}
         </AnimatePresence>
 
-        {isTyping ? (
+        {isTyping && athletyxStatus ? <AthletyxStatus label={athletyxStatus} /> : null}
+
+        {isTyping && !athletyxStatus ? (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-start">
             <div className="flex items-center gap-1 rounded-2xl border border-zinc-800 bg-zinc-900/80 px-4 py-3">
               <span className="h-2 w-2 animate-bounce rounded-full bg-violet-400 [animation-delay:0ms]" />
@@ -196,7 +217,7 @@ export default function AITrainerChat({ analysis }) {
           <input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask your AI coach..."
+            placeholder="Ask IronCoach (Athletyx RAG)..."
             disabled={isTyping}
             className="flex-1 rounded-2xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-white placeholder:text-zinc-600 disabled:opacity-60"
           />

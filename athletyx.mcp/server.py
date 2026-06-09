@@ -29,7 +29,8 @@ mcp = FastMCP(
         "Athletyx fitness MCP server (app-store grade). "
         "Requires ATHLETYX_USER_ID in env for user-scoped tools. "
         "Read legal/health resources before coaching. "
-        "Use get_goal_contract before personalized advice. "
+        "Use get_personalization_context and get_goal_contract before personalized advice. "
+        "Use search_documents_with_context for in-app docs; search_web_duckduckgo for SerpAPI research. "
         "Admin-only: search_users_by_profile (set ATHLETYX_ADMIN=true)."
     ),
 )

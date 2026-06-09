@@ -37,7 +37,15 @@ _POLICIES = {
     "athletyx://privacy/data-categories": json.dumps(
         {
             "contact": ["email", "name"],
-            "health_fitness": ["workouts", "bodyweight", "goals"],
+            "health_fitness": [
+                "workouts",
+                "bodyweight",
+                "goals",
+                "age",
+                "injury_history",
+                "movement_restrictions",
+                "max_effort_level",
+            ],
             "user_content": ["notes", "chat"],
             "identifiers": ["user_id"],
         },
@@ -111,3 +119,7 @@ def register(mcp) -> None:
     @mcp.resource("athletyx://exercises/catalog")
     def exercise_catalog() -> str:
         return (_CONTENT / "exercises.json").read_text(encoding="utf-8")
+
+    @mcp.resource("athletyx://coaching/personalization-guide")
+    def personalization_guide() -> str:
+        return (_CONTENT / "personalization-guide.md").read_text(encoding="utf-8")

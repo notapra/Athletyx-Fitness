@@ -17,6 +17,49 @@ from tools.helpers import fail, ok, safe_execute
 
 def register(mcp) -> None:
     @mcp.tool()
+    def update_personal_factors(
+        age: int | None = None,
+        max_effort_level: str | None = None,
+        injury_history: list[str] | None = None,
+        movement_restrictions: list[str] | None = None,
+        recovery_capacity: str | None = None,
+        medical_clearance: bool | None = None,
+        notes: str | None = None,
+    ) -> dict:
+        """
+        Update age and personal injury/effort profile for safe personalized coaching.
+        max_effort_level: conservative | moderate | aggressive
+        recovery_capacity: slow | average | fast
+        """
+
+        def _run():
+            user_id = get_authenticated_user_id()
+            updates: dict = {}
+            if max_effort_level is not None:
+                updates["max_effort_level"] = max_effort_level
+            if injury_history is not None:
+                updates["injury_history"] = injury_history
+            if movement_restrictions is not None:
+                updates["movement_restrictions"] = movement_restrictions
+            if recovery_capacity is not None:
+                updates["recovery_capacity"] = recovery_capacity
+            if medical_clearance is not None:
+                updates["medical_clearance"] = medical_clearance
+            if notes is not None:
+                updates["notes"] = notes
+
+            user = update_user_preferences(
+                user_id,
+                age=age,
+                personal_factors=updates if updates else None,
+            )
+            if user is None:
+                return fail("Personal factors update failed.")
+            return ok(user.model_dump(), "Personal factors updated.")
+
+        return safe_execute(_run)
+
+    @mcp.tool()
     def get_current_user_profile() -> dict:
         """Return the authenticated user's fitness profile (requires ATHLETYX_USER_ID)."""
 
@@ -36,6 +79,7 @@ def register(mcp) -> None:
         units: str | None = None,
         bodyweight: float | None = None,
         ai_enabled: bool | None = None,
+        age: int | None = None,
         constraints: list[str] | None = None,
     ) -> dict:
         """Update profile fields for the authenticated user. Audited."""
@@ -49,6 +93,7 @@ def register(mcp) -> None:
                 units=units,
                 bodyweight=bodyweight,
                 ai_enabled=ai_enabled,
+                age=age,
                 constraints=constraints,
             )
             if user is None:
@@ -96,8 +141,16 @@ def register(mcp) -> None:
                     {"name": "Contact Info", "fields": ["email", "name"], "purpose": "Account"},
                     {
                         "name": "Health & Fitness",
-                        "fields": ["workouts", "bodyweight", "goals"],
-                        "purpose": "Core app",
+                        "fields": [
+                            "workouts",
+                            "bodyweight",
+                            "goals",
+                            "age",
+                            "injury_history",
+                            "movement_restrictions",
+                            "max_effort_level",
+                        ],
+                        "purpose": "Core app + safe personalization",
                     },
                     {
                         "name": "User Content",

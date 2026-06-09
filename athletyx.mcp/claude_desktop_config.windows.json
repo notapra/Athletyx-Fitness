@@ -15,7 +15,7 @@
       }
     },
     "athletyx-postgres-storage": {
-      "command": "npx",
+      "command": "D:\\npx.cmd",
       "args": [
         "-y",
         "@modelcontextprotocol/server-postgres",

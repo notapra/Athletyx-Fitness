@@ -8,11 +8,14 @@ import os
 import sys
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import Json, RealDictCursor
+
+_ROOT = Path(__file__).resolve().parent
 
 from models import (
     AuditEntry,
@@ -20,13 +23,16 @@ from models import (
     ExerciseEntryDetail,
     Goal,
     GoalContract,
+    PersonalFactors,
     SetRecord,
     User,
     WorkoutSessionDetail,
     WorkoutSessionSummary,
 )
+from personalization import merge_personal_factors
 
-load_dotenv()
+# Always load athletyx.mcp/.env regardless of process cwd (MCP clients use absolute paths).
+load_dotenv(_ROOT / ".env")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 _USER_COLUMNS = (
     "id, name, email, fitness_goal, experience_level, "
-    "units, bodyweight, ai_enabled"
+    "units, bodyweight, ai_enabled, age, constraints, personal_factors"
 )
 
 
@@ -70,7 +76,17 @@ def get_connection():
 def _row_to_user(row: dict[str, Any] | None) -> User | None:
     if row is None:
         return None
-    return User.model_validate(dict(row))
+    data = dict(row)
+    raw_constraints = data.get("constraints")
+    if isinstance(raw_constraints, str):
+        data["constraints"] = json.loads(raw_constraints)
+    elif raw_constraints is None:
+        data["constraints"] = []
+    raw_factors = data.get("personal_factors")
+    if isinstance(raw_factors, str):
+        raw_factors = json.loads(raw_factors)
+    data["personal_factors"] = PersonalFactors.model_validate(raw_factors or {})
+    return User.model_validate(data)
 
 
 def _iso(value: Any) -> str | None:
@@ -158,10 +174,20 @@ def update_user_preferences(
     units: str | None = None,
     bodyweight: float | None = None,
     ai_enabled: bool | None = None,
+    age: int | None = None,
     constraints: list[str] | None = None,
+    personal_factors: dict | None = None,
 ) -> User | None:
     fields: list[str] = []
     params: list[Any] = []
+
+    if personal_factors is not None:
+        existing = fetch_user_by_id(user_id)
+        merged = merge_personal_factors(
+            existing.personal_factors.model_dump() if existing else None,
+            personal_factors,
+        )
+        personal_factors = merged
 
     mapping: list[tuple[str, Any]] = [
         ("fitness_goal", fitness_goal),
@@ -169,7 +195,9 @@ def update_user_preferences(
         ("units", units),
         ("bodyweight", bodyweight),
         ("ai_enabled", ai_enabled),
+        ("age", age),
         ("constraints", Json(constraints) if constraints is not None else None),
+        ("personal_factors", Json(personal_factors) if personal_factors is not None else None),
     ]
     for column, value in mapping:
         if value is not None:
@@ -296,28 +324,33 @@ def complete_goal(user_id: int, goal_id: int) -> Goal | None:
 
 
 def build_goal_contract(user_id: int) -> GoalContract | None:
+    from personalization import build_personalization_context
+
     user = fetch_user_by_id(user_id)
     if user is None:
         return None
 
-    sql = "SELECT constraints FROM users WHERE id = %s"
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, (user_id,))
-            row = cur.fetchone()
-    raw_constraints = row[0] if row else []
-    if isinstance(raw_constraints, str):
-        constraints = json.loads(raw_constraints)
-    else:
-        constraints = raw_constraints or []
-
+    ctx = build_personalization_context(user, None)
     return GoalContract(
         primary_goal=user.fitness_goal,
         experience_level=user.experience_level,
         active_goals=fetch_active_goals(user_id),
-        constraints=constraints,
+        constraints=user.constraints,
         units=user.units,
+        age=user.age,
+        personal_factors=user.personal_factors,
+        coaching_directives=ctx["coaching_directives"],
     )
+
+
+def fetch_personalization_context(user_id: int) -> dict | None:
+    from personalization import build_personalization_context
+
+    user = fetch_user_by_id(user_id)
+    if user is None:
+        return None
+    contract = build_goal_contract(user_id)
+    return build_personalization_context(user, contract)
 
 
 # ---------------------------------------------------------------------------
