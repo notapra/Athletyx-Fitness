@@ -1,0 +1,10 @@
+# Railway / Fly.io / Render deployment for Athletyx Coach API
+# See docs/production-deploy.md
+
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "uvicorn backend.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30

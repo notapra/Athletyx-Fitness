@@ -3,67 +3,91 @@
 ## Prerequisites
 
 - [Supabase](https://supabase.com) account (free tier works)
-- [Vercel](https://vercel.com) account (optional, for hosting)
+- [Vercel](https://vercel.com) account (optional, for web hosting)
+- Apple Developer + Google Play accounts (for Capacitor store builds)
 
 ## 1. Supabase setup
 
 1. Create a new Supabase project.
-2. Open **SQL Editor** and run the entire contents of `supabase/schema.sql`.
-3. Enable **Realtime** for these tables (Database → Replication):
-   - `workout_sessions`
-   - `bodyweight_logs`
-   - `goals`
-   - `ai_chat_history`
-4. Under **Authentication → URL Configuration**, add your site URL:
+2. Open **SQL Editor** and run `supabase/schema.sql`, then migrations in `supabase/migrations/`.
+3. Enable **Realtime** for: `workout_sessions`, `bodyweight_logs`, `goals`, `ai_chat_history`.
+4. Under **Authentication → URL Configuration**, add:
    - Local: `http://localhost:5173`
-   - Production: `https://your-app.vercel.app`
+   - Production web: `https://your-app.vercel.app`
+   - Capacitor: `capacitor://localhost`, `https://localhost`
 5. Copy **Project URL** and **anon public key** from Settings → API.
 
 ## 2. Environment variables
 
 ```bash
 cp .env.example .env
+cp PRIVATE.env.example PRIVATE.env
 ```
 
-Edit `.env`:
+**Frontend (`.env` — safe for Vite, no secrets):**
 
 ```
 VITE_SUPABASE_URL=https://xxxx.supabase.co
 VITE_SUPABASE_ANON_KEY=eyJhbG...
+VITE_ATHLETYX_API_URL=https://api.yourdomain.com/api/coach
+VITE_SENTRY_DSN=          # optional
 ```
 
-Restart the dev server after changing `.env`.
+**Backend (`PRIVATE.env` — never commit):**
+
+```
+OPENAI_API_KEY=
+SERPAPI_API_KEY=
+SUPABASE_URL=https://xxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbG...
+REQUIRE_AUTH=true
+CORS_ORIGINS=http://localhost:5173,capacitor://localhost,https://localhost,https://your-app.vercel.app
+```
+
+Restart dev servers after changing env files.
 
 ## 3. Local development
 
 ```bash
 npm install
-npm run dev
+npm run dev          # IronLog on :5173
+npm run dev:api      # Athletyx API on :8000 (loads PRIVATE.env)
 ```
 
-Open http://localhost:5173
+Without `VITE_SUPABASE_*`, the app runs **local-only** (no login gate).
 
-## 4. Deploy to Vercel
+## 4. Deploy web (Vercel)
 
-1. Push the repo to GitHub.
-2. Import the project in Vercel.
-3. Add environment variables:
-   - `VITE_SUPABASE_URL`
-   - `VITE_SUPABASE_ANON_KEY`
-4. Deploy.
+1. Push to GitHub; import in Vercel.
+2. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ATHLETYX_API_URL`.
+3. Deploy and add the URL to Supabase Auth allowlist.
 
-Set the same URLs in Supabase Auth redirect allowlist.
+## 5. Deploy Coach API
 
-## 5. Data migration
+See [`docs/production-deploy.md`](docs/production-deploy.md) and `athletyx/railway.toml`.
 
-On first login, the app automatically uploads existing `localStorage` workouts, bodyweight, and goals to Supabase. Duplicates are prevented via `client_id` unique constraints.
+Health check: `GET /health`. Production requires `REQUIRE_AUTH=true` and Supabase JWT on `POST /api/coach`.
 
-## 6. Security
+## 6. Capacitor mobile builds
+
+```bash
+npm run build:mobile
+npx cap open ios       # macOS + Xcode → TestFlight
+npx cap open android   # Android Studio → Internal testing
+```
+
+`vite.config.js` uses `base: './'` for Capacitor asset loading.
+
+## 7. Data migration & sync
+
+On first login, existing `localStorage` workouts, bodyweight, goals, and profile upload to Supabase. Duplicates are prevented via `client_id` unique constraints. Offline changes queue in IndexedDB and sync on reconnect / app foreground.
+
+## 8. Security
 
 - Row Level Security (RLS) ensures users only access their own rows.
-- Never commit `.env` or expose the **service role** key in the frontend.
-- Only the **anon** key belongs in `VITE_SUPABASE_ANON_KEY`.
+- Never commit `.env`, `PRIVATE.env`, or the Supabase **service role** key.
+- OpenAI and SerpAPI keys stay in `PRIVATE.env` on the **server only** — not in `VITE_*`.
 
-## 7. Optional: OpenAI
+## 9. CI/CD
 
-To connect live LLM responses, set `VITE_OPENAI_API_KEY` and pass `useApi: true` in `sendChatMessage()` inside `src/services/aiService.js`.
+GitHub Actions (`.github/workflows/ci.yml`) runs `npm run lint`, `npm run build`, and `pytest` on push/PR.

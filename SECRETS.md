@@ -6,26 +6,50 @@
 
 ```bash
 cp PRIVATE.env.example PRIVATE.env
-# Edit PRIVATE.env — only exists on your machine
+cp .env.example .env
 ```
 
 | File | Committed? | Purpose |
 |------|------------|---------|
 | `PRIVATE.env.example` | Yes | Template with empty placeholders |
-| `PRIVATE.env` | **No** | Your real OpenAI + SerpAPI keys |
-| `athletyx.mcp/.env` | **No** | MCP server / Postgres (optional duplicate of SerpAPI key) |
-| `.env.local` | **No** | Vite public config only (Supabase URL, etc.) |
+| `PRIVATE.env` | **No** | OpenAI, SerpAPI, Supabase server keys |
+| `.env.example` | Yes | Vite public config template |
+| `.env` / `.env.local` | **No** | Supabase anon key, API URL, Sentry DSN |
+| `athletyx.mcp/.env` | **No** | MCP Postgres + optional JWT |
+
+## Environment matrix
+
+| Variable | Where | Notes |
+|----------|-------|-------|
+| `VITE_SUPABASE_URL` | Frontend `.env` | Public anon client |
+| `VITE_SUPABASE_ANON_KEY` | Frontend `.env` | Public anon client |
+| `VITE_ATHLETYX_API_URL` | Frontend `.env` | Hosted coach endpoint |
+| `VITE_SENTRY_DSN` | Frontend `.env` | Optional error tracking |
+| `OPENAI_API_KEY` | `PRIVATE.env` | Athletyx backend only |
+| `SERPAPI_API_KEY` | `PRIVATE.env` | Athletyx backend only |
+| `SERPAPI_ENABLED` | `PRIVATE.env` | Set `true` to allow web search; default `false` |
+| `SUPABASE_URL` | `PRIVATE.env` | JWT validation on API |
+| `SUPABASE_ANON_KEY` | `PRIVATE.env` | JWT validation on API |
+| `REQUIRE_AUTH` | `PRIVATE.env` | `true` in production |
+| `CORS_ORIGINS` | `PRIVATE.env` | Comma-separated allowed origins |
+| `COACH_CACHE_MAX_ENTRIES` | `PRIVATE.env` | Default 500 |
+| `COACH_CACHE_ENABLED` | `PRIVATE.env` | Set `false` to disable server cache |
+| `MCP_REQUIRE_AUTH` | `athletyx.mcp/.env` | Post-v1 MCP JWT gate |
+| `ATHLETYX_MCP_JWT` | Agent env | Supabase access token for MCP |
 
 ## What loads secrets
 
-- **IronLog + Athletyx backend** (`athletyx/backend/`) → `PRIVATE.env` at repo root
-- **MCP server** (`athletyx.mcp/`) → `athletyx.mcp/.env`
+- **Athletyx Coach API** (`athletyx/backend/`) → `PRIVATE.env` at repo root
+- **MCP server** (`athletyx.mcp/`) → `athletyx.mcp/.env` + optional `ATHLETYX_MCP_JWT`
 
 ## Browser rule
 
-Only variables prefixed with `VITE_` are visible in the React app. **Do not** put
-`OPENAI_API_KEY` or `SERPAPI_API_KEY` in `VITE_*` — keep them in `PRIVATE.env` on the backend.
+Only `VITE_*` variables are visible in the React app. **Do not** put `OPENAI_API_KEY` or `SERPAPI_API_KEY` in `VITE_*`.
+
+## Staging vs production
+
+Use separate Supabase projects and Railway/Vercel environments. GitHub Actions uses placeholder env vars for build-only checks.
 
 ## If a key leaks
 
-Rotate at [OpenAI](https://platform.openai.com/) / [SerpAPI](https://serpapi.com/) and update `PRIVATE.env` only.
+Rotate at [OpenAI](https://platform.openai.com/) / [SerpAPI](https://serpapi.com/) / Supabase dashboard and update `PRIVATE.env` only.

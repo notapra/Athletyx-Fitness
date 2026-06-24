@@ -77,7 +77,7 @@ export default function AITrainer() {
               <h1 className="text-xl font-bold text-white">IronCoach</h1>
               <p className="text-[10px] text-cyan-400/90">
                 Powered by <span className="font-semibold text-cyan-300">Athletyx</span> — personalized
-                RAG + DuckDuckGo citations
+                RAG knowledge base citations
               </p>
             </div>
           </div>

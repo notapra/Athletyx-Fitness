@@ -17,10 +17,16 @@ import { normalizeSessions } from '../utils/calculations.js'
 import { buildGoalContract } from '../utils/goalContract.js'
 import { maybePostWorkoutReminder } from '../services/guardianService.js'
 import { dismissReminder } from '../utils/reminderScheduler.js'
+import { isSupabaseConfigured } from '../services/authService.js'
+import { pushSessionToCloud, scheduleSyncAll, pullFromCloud } from '../services/syncService.js'
+import { enqueueSyncOp } from '../services/offlineQueue.js'
+import { useNetworkSync } from '../hooks/useNetworkSync.js'
 
 export function AppProvider({ children }) {
   const { profile, userId } = useAuth()
   const effectiveUserId = userId ?? LOCAL_USER_ID
+  const online = useNetworkSync(effectiveUserId)
+  const cloudEnabled = isSupabaseConfigured && effectiveUserId !== LOCAL_USER_ID
 
   const [sessions, setSessions] = useState(() => loadSessions().map(migrateLegacyWorkout))
   const [bodyweight, setBodyweight] = useState(() => loadBodyweight())
@@ -78,9 +84,15 @@ export function AppProvider({ children }) {
       if (reminder) setGuardianReminder(reminder)
       if (sessionNote) setSessionGuardianNote(sessionNote)
 
+      if (cloudEnabled) {
+        enqueueSyncOp({ type: 'session', userId: effectiveUserId, session: finished }).then(() =>
+          pushSessionToCloud(effectiveUserId, finished)
+        )
+      }
+
       return true
     },
-    [profile, goals, sessions, effectiveUserId]
+    [profile, goals, sessions, effectiveUserId, cloudEnabled]
   )
 
   const dismissGuardianReminder = useCallback(() => {
@@ -141,6 +153,24 @@ export function AppProvider({ children }) {
     setActiveSession(loadActiveSession())
   }, [])
 
+  useEffect(() => {
+    function onStorageReload() {
+      reloadFromStorage()
+    }
+    window.addEventListener('ironlog:storage-reload', onStorageReload)
+    return () => window.removeEventListener('ironlog:storage-reload', onStorageReload)
+  }, [reloadFromStorage])
+
+  const pullFromCloudHandler = useCallback(async () => {
+    if (!cloudEnabled) return
+    await pullFromCloud(effectiveUserId)
+    reloadFromStorage()
+  }, [cloudEnabled, effectiveUserId, reloadFromStorage])
+
+  const scheduleSyncAllHandler = useCallback(() => {
+    if (cloudEnabled) scheduleSyncAll(effectiveUserId)
+  }, [cloudEnabled, effectiveUserId])
+
   const value = {
     sessions: normalizedSessions,
     rawSessions: sessions,
@@ -165,10 +195,10 @@ export function AppProvider({ children }) {
     toggleGoal,
     syncing: false,
     dataReady: true,
-    online: true,
-    cloudEnabled: false,
-    pullFromCloud: () => {},
-    scheduleSyncAll: () => {},
+    online,
+    cloudEnabled,
+    pullFromCloud: pullFromCloudHandler,
+    scheduleSyncAll: scheduleSyncAllHandler,
     reloadFromStorage,
     userId: effectiveUserId,
     profile,

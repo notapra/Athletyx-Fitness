@@ -1,3 +1,5 @@
+import { prefGet, prefSet } from './preferencesStorage.js'
+
 const STORAGE_KEY = 'ironlog_island_position_v1'
 
 export function getDefaultIslandPosition() {
@@ -9,7 +11,19 @@ export function getDefaultIslandPosition() {
   }
 }
 
-export function loadIslandPosition() {
+export async function loadIslandPosition() {
+  try {
+    const raw = await prefGet(STORAGE_KEY)
+    if (!raw) return getDefaultIslandPosition()
+    const parsed = JSON.parse(raw)
+    if (typeof parsed.x === 'number' && typeof parsed.y === 'number') return parsed
+  } catch {
+    /* ignore */
+  }
+  return getDefaultIslandPosition()
+}
+
+export function loadIslandPositionSync() {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return getDefaultIslandPosition()
@@ -21,9 +35,11 @@ export function loadIslandPosition() {
   return getDefaultIslandPosition()
 }
 
-export function saveIslandPosition(pos) {
+export async function saveIslandPosition(pos) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(pos))
+    const json = JSON.stringify(pos)
+    await prefSet(STORAGE_KEY, json)
+    localStorage.setItem(STORAGE_KEY, json)
   } catch {
     /* storage full */
   }

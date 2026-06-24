@@ -2,13 +2,17 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion, useDragControls, useMotionValue } from 'framer-motion'
 import { ChevronDown, GripVertical, Sparkles, X } from 'lucide-react'
 import { useMuscleAnalytics } from '../../hooks/useMuscleAnalytics.js'
-import { loadIslandPosition, saveIslandPosition } from '../../utils/islandPosition.js'
+import { loadIslandPosition, loadIslandPositionSync, saveIslandPosition } from '../../utils/islandPosition.js'
 
 const spring = { type: 'spring', stiffness: 380, damping: 32 }
 
 export default function DynamicIsland() {
   const [expanded, setExpanded] = useState(false)
-  const [position, setPosition] = useState(loadIslandPosition)
+  const [position, setPosition] = useState(loadIslandPositionSync)
+
+  useEffect(() => {
+    loadIslandPosition().then(setPosition)
+  }, [])
   const dragControls = useDragControls()
   const constraintsRef = useRef(null)
   const x = useMotionValue(position.x)

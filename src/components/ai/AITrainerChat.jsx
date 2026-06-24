@@ -1,5 +1,5 @@
 /**
- * IronCoach chat UI — Athletyx RAG + DuckDuckGo with cited sources.
+ * IronCoach chat UI — Athletyx RAG with cited sources.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -116,7 +116,7 @@ export default function AITrainerChat({ analysis }) {
           <div>
             <p className="text-sm font-semibold text-white">IronCoach</p>
             <p className="text-[10px] text-cyan-400/90">
-              Powered by <span className="font-semibold">Athletyx</span> · RAG + DuckDuckGo
+              Powered by <span className="font-semibold">Athletyx</span> · RAG knowledge base
             </p>
           </div>
         </div>
@@ -139,6 +139,12 @@ export default function AITrainerChat({ analysis }) {
               animate={{ opacity: 1, y: 0 }}
               className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
             >
+              {msg.role === 'assistant' && msg.athletyxMeta?.fromCache ? (
+                <p className="mb-1 text-[9px] text-emerald-500/80">
+                  Saved answer · no API call
+                  {msg.athletyxMeta.cacheLayer ? ` (${msg.athletyxMeta.cacheLayer})` : ''}
+                </p>
+              ) : null}
               {msg.role === 'assistant' && msg.athletyxMeta?.poweredBy ? (
                 <p className="mb-1 text-[9px] font-semibold uppercase tracking-wider text-cyan-500/80">
                   {msg.athletyxMeta.poweredBy}

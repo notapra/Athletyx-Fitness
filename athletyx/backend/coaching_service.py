@@ -6,6 +6,7 @@ Loads API keys from PRIVATE.env (repo root). Never expose keys to the browser.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import re
 import sys
@@ -21,11 +22,65 @@ _MCP_ROOT = _REPO_ROOT / "athletyx.mcp"
 load_dotenv(_REPO_ROOT / "PRIVATE.env")
 load_dotenv(_MCP_ROOT / ".env")
 
-if str(_MCP_ROOT) not in sys.path:
-    sys.path.insert(0, str(_MCP_ROOT))
 
-from personalization import build_personalization_context_from_profile  # noqa: E402
-from tools.research import rank_documents, search_via_serpapi  # noqa: E402
+def _load_mcp_module(module_name: str, relative_path: str):
+    """Load athletyx.mcp modules without permanently shadowing athletyx/tools."""
+    path = _MCP_ROOT / relative_path
+    mcp = str(_MCP_ROOT)
+    inserted = mcp not in sys.path
+    if inserted:
+        sys.path.insert(0, mcp)
+    try:
+        spec = importlib.util.spec_from_file_location(f"athletyx_mcp_{module_name}", path)
+        if spec is None or spec.loader is None:
+            raise ImportError(f"Cannot load MCP module at {path}")
+        mod = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = mod
+        spec.loader.exec_module(mod)
+        return mod
+    finally:
+        if inserted and mcp in sys.path:
+            sys.path.remove(mcp)
+
+
+_personalization = _load_mcp_module("personalization", "personalization.py")
+_research = _load_mcp_module("research", "tools/research.py")
+build_personalization_context_from_profile = _personalization.build_personalization_context_from_profile
+rank_documents = _research.rank_documents
+search_via_serpapi = _research.search_via_serpapi
+
+
+def _purge_mcp_tools_namespace() -> None:
+    """research.py imports mcp.tools.* — remove so athletyx/tools stays importable."""
+    tools_mod = sys.modules.get("tools")
+    tools_file = (getattr(tools_mod, "__file__", "") or "").replace("\\", "/")
+    if "athletyx.mcp" in tools_file:
+        for key in list(sys.modules):
+            if key == "tools" or key.startswith("tools."):
+                del sys.modules[key]
+
+
+_purge_mcp_tools_namespace()
+
+from contextlib import contextmanager  # noqa: E402
+
+
+@contextmanager
+def _mcp_import_path():
+    """Expose athletyx.mcp on sys.path for RAG doc loading during coach requests."""
+    mcp = str(_MCP_ROOT)
+    inserted = mcp not in sys.path
+    if inserted:
+        sys.path.insert(0, mcp)
+    try:
+        yield
+    finally:
+        _purge_mcp_tools_namespace()
+        if inserted and mcp in sys.path:
+            sys.path.remove(mcp)
+
+
+from backend.query_cache import get_cached_response, save_cached_response  # noqa: E402
 
 _WEB_RESEARCH_RE = re.compile(
     r"\b(research|study|studies|evidence|science|safe|alternative|injury|rehab|"
@@ -38,8 +93,30 @@ def _openai_key() -> str:
     return os.getenv("OPENAI_API_KEY", "").strip()
 
 
+def _serpapi_available() -> bool:
+    flag = os.getenv("SERPAPI_ENABLED", "false").lower()
+    if flag not in ("1", "true", "yes"):
+        return False
+    return bool(os.getenv("SERPAPI_API_KEY", "").strip())
+
+
+def serpapi_available() -> bool:
+    return _serpapi_available()
+
+
 def _should_web_search(message: str) -> bool:
     return bool(_WEB_RESEARCH_RE.search(message))
+
+
+def _web_search_enabled(message: str, use_web_search: bool | None) -> bool:
+    """Run SerpAPI/DDG only when explicitly allowed and API key is configured."""
+    if use_web_search is False:
+        return False
+    if not _serpapi_available():
+        return False
+    if use_web_search is True:
+        return True
+    return _should_web_search(message)
 
 
 def _format_rag_block(hits: list[dict]) -> str:
@@ -208,48 +285,61 @@ async def coach_with_athletyx(
     if not text:
         return {"content": "Ask me about training, recovery, or injuries.", "sources": {}}
 
-    personalization = build_personalization_context_from_profile(profile, goals)
-    search_context = personalization["search_context"]
+    cached, cache_meta = get_cached_response(text, profile, goals)
+    if cached:
+        cached["cache"] = cache_meta
+        return cached
 
-    doc_hits = rank_documents(text, search_context, limit=5)
-    rag_block = _format_rag_block(doc_hits)
+    with _mcp_import_path():
+        personalization = build_personalization_context_from_profile(profile, goals)
+        search_context = personalization["search_context"]
 
-    web_data: dict | None = None
-    web_block = ""
-    do_web = use_web_search if use_web_search is not None else _should_web_search(text)
-    if do_web:
-        try:
-            enriched = f"{text} ({search_context})"
-            web_data = search_via_serpapi(enriched, engine="duckduckgo", num=6)
-            web_block = _format_web_block(web_data)
-        except Exception as exc:
-            web_block = f"(Web search unavailable: {exc})"
+        doc_hits = rank_documents(text, search_context, limit=5)
+        rag_block = _format_rag_block(doc_hits)
 
-    system_prompt = _build_system_prompt(text, analysis, personalization, rag_block, web_block)
+        web_data: dict | None = None
+        web_block = ""
+        serpapi_ok = _serpapi_available()
+        do_web = _web_search_enabled(text, use_web_search)
+        if do_web:
+            try:
+                enriched = f"{text} ({search_context})"
+                web_data = search_via_serpapi(enriched, engine="duckduckgo", num=6)
+                web_block = _format_web_block(web_data)
+            except Exception as exc:
+                web_block = f"(Web search unavailable: {exc})"
 
-    if _openai_key():
-        try:
-            content = await _call_openai(system_prompt, text)
-        except Exception as exc:
+        system_prompt = _build_system_prompt(text, analysis, personalization, rag_block, web_block)
+
+        if _openai_key():
+            try:
+                content = await _call_openai(system_prompt, text)
+            except Exception as exc:
+                content = _fallback_reply(text, personalization, rag_block, web_block)
+                content += f"\n\n_(LLM error: {exc})_"
+        else:
             content = _fallback_reply(text, personalization, rag_block, web_block)
-            content += f"\n\n_(LLM error: {exc})_"
-    else:
-        content = _fallback_reply(text, personalization, rag_block, web_block)
 
-    return {
-        "content": content,
-        "powered_by": "Athletyx",
-        "personalization_applied": search_context,
-        "citations": _build_citations(doc_hits, web_data),
-        "search_trace": {
-            "personalized": True,
-            "rag_hits": len(doc_hits),
-            "web_search_used": do_web,
-            "web_engine": "duckduckgo" if web_data else None,
-        },
-        "sources": {
-            "documents": doc_hits,
-            "web": web_data,
-        },
-        "tool_used": "athletyx_rag_coach",
-    }
+        result = {
+            "content": content,
+            "powered_by": "Athletyx",
+            "personalization_applied": search_context,
+            "citations": _build_citations(doc_hits, web_data),
+            "search_trace": {
+                "personalized": True,
+                "rag_hits": len(doc_hits),
+                "web_search_available": serpapi_ok,
+                "web_search_requested": do_web,
+                "web_search_used": bool(web_data),
+                "web_engine": "duckduckgo" if web_data else None,
+                "cache_hit": False,
+            },
+            "sources": {
+                "documents": doc_hits,
+                "web": web_data,
+            },
+            "tool_used": "athletyx_rag_coach",
+        }
+    save_meta = save_cached_response(text, profile, goals, result)
+    result["cache"] = {**cache_meta, **save_meta, "cache_hit": False}
+    return result

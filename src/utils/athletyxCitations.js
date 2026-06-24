@@ -58,6 +58,6 @@ export function buildCitationsFromAthletyxResponse(result) {
 export const ATHLETYX_STATUS_STEPS = [
   { key: 'personalize', label: 'Athletyx · personalizing for your profile' },
   { key: 'rag', label: 'Athletyx · searching knowledge base (RAG)' },
-  { key: 'web', label: 'Athletyx · searching DuckDuckGo' },
+  { key: 'web', label: 'Athletyx · searching the web' },
   { key: 'synthesize', label: 'Athletyx · building your answer' },
 ]

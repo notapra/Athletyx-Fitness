@@ -1,0 +1,17 @@
+{
+  "appId": "com.athletyx.ironlog",
+  "appName": "IronLog",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 2000,
+      "backgroundColor": "#09090b"
+    },
+    "Keyboard": {
+      "resize": "body"
+    }
+  }
+}

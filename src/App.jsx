@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { AppProvider } from './context/AppContext.jsx'
+import AuthGate from './components/auth/AuthGate.jsx'
 import { useApp } from './hooks/useApp.js'
 import AppShell from './components/layout/AppShell.jsx'
 import ActiveWorkout from './components/workout/ActiveWorkout.jsx'
@@ -117,9 +118,11 @@ function AppContent() {
 export default function App() {
   return (
     <AuthProvider>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
+      <AuthGate>
+        <AppProvider>
+          <AppContent />
+        </AppProvider>
+      </AuthGate>
     </AuthProvider>
   )
 }

@@ -12,7 +12,14 @@
 
 import { buildChatPrompt } from '../utils/aiPrompts.js'
 import { reviewCoachReply, buildRefocusedReply } from './guardianService.js'
-import { sendAthletyxCoachMessage, checkAthletyxHealth } from './athletyxService.js'
+import { sendAthletyxCoachMessage, getAthletyxHealth } from './athletyxService.js'
+import {
+  getCachedCoachResponse,
+  saveCachedCoachResponse,
+  recordCloudCoachCacheEvent,
+  getCloudCachedCoachResponse,
+  saveCloudCachedCoachResponse,
+} from './coachCache.js'
 import { loadProfile } from '../utils/storage.js'
 import { buildCitationsFromAthletyxResponse } from '../utils/athletyxCitations.js'
 
@@ -155,28 +162,102 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
   // Athletyx backend: RAG + SerpAPI + personalization (keys in PRIVATE.env on server)
   if (useAthletyx) {
     try {
-      onAthletyxStatus?.('Athletyx · checking connection…')
-      const apiUp = await checkAthletyxHealth()
-      if (apiUp) {
-        onAthletyxStatus?.('Athletyx · personalizing for your profile')
-        const userProfile = profile ?? loadProfile()
-        onAthletyxStatus?.('Athletyx · searching knowledge base (RAG)')
-        const ragTimer = setTimeout(() => {
-          onAthletyxStatus?.('Athletyx · searching DuckDuckGo')
-        }, 900)
-        const result = await sendAthletyxCoachMessage(userMessage, {
+      const userProfile = profile ?? loadProfile()
+
+      // 1) Client IndexedDB cache (no network)
+      onAthletyxStatus?.('IronCoach · checking saved answers…')
+      const localCached = await getCachedCoachResponse(userMessage, {
+        profile: userProfile,
+        goals,
+      })
+      if (localCached.hit) {
+        onAthletyxStatus?.('IronCoach · reused saved answer')
+        draft = localCached.response.content
+        athletyxMeta = {
+          poweredBy: localCached.response.powered_by ?? 'Athletyx',
+          citations: buildCitationsFromAthletyxResponse(localCached.response),
+          searchTrace: localCached.response.search_trace ?? {},
+          personalizationApplied: localCached.response.personalization_applied,
+          fromCache: true,
+          cacheLayer: 'client',
+        }
+        if (userId && userId !== 'local') {
+          recordCloudCoachCacheEvent(userId, 'hit', {
+            cache_key: localCached.key?.slice(0, 16),
+            layer: 'client',
+          })
+        }
+      }
+
+      // 2) Cloud cache (Supabase) when signed in
+      if (!draft && userId && userId !== 'local') {
+        const cloudCached = await getCloudCachedCoachResponse(userId, userMessage, {
           profile: userProfile,
           goals,
-          analysis,
         })
-        clearTimeout(ragTimer)
-        onAthletyxStatus?.('Athletyx · building your answer')
-        draft = result.content
-        athletyxMeta = {
-          poweredBy: result.powered_by ?? 'Athletyx',
-          citations: buildCitationsFromAthletyxResponse(result),
-          searchTrace: result.search_trace ?? {},
-          personalizationApplied: result.personalization_applied,
+        if (cloudCached.hit) {
+          onAthletyxStatus?.('IronCoach · synced answer from cloud')
+          draft = cloudCached.response.content
+          athletyxMeta = {
+            poweredBy: cloudCached.response.powered_by ?? 'Athletyx',
+            citations: buildCitationsFromAthletyxResponse(cloudCached.response),
+            searchTrace: { ...(cloudCached.response.search_trace ?? {}), cache_hit: true, cache_layer: 'cloud' },
+            personalizationApplied: cloudCached.response.personalization_applied,
+            fromCache: true,
+            cacheLayer: 'cloud',
+          }
+          await saveCachedCoachResponse(userMessage, { profile: userProfile, goals }, cloudCached.response)
+        }
+      }
+
+      // 3) Live API (RAG + optional LLM; web search only when SerpAPI is configured)
+      if (!draft) {
+        onAthletyxStatus?.('Athletyx · checking connection…')
+        const health = await getAthletyxHealth()
+        if (health.ok) {
+          onAthletyxStatus?.('Athletyx · personalizing for your profile')
+          onAthletyxStatus?.('Athletyx · searching knowledge base (RAG)')
+          let ragTimer
+          if (health.webSearchAvailable) {
+            ragTimer = setTimeout(() => {
+              onAthletyxStatus?.('Athletyx · searching the web')
+            }, 900)
+          }
+          const result = await sendAthletyxCoachMessage(userMessage, {
+            profile: userProfile,
+            goals,
+            analysis,
+            useWebSearch: health.webSearchAvailable ? undefined : false,
+          })
+          if (ragTimer) clearTimeout(ragTimer)
+          onAthletyxStatus?.(
+            result.from_cache || result.search_trace?.cache_hit
+              ? 'Athletyx · reused saved answer'
+              : 'Athletyx · building your answer'
+          )
+          draft = result.content
+          athletyxMeta = {
+            poweredBy: result.powered_by ?? 'Athletyx',
+            citations: buildCitationsFromAthletyxResponse(result),
+            searchTrace: result.search_trace ?? {},
+            personalizationApplied: result.personalization_applied,
+            fromCache: Boolean(result.from_cache || result.cache?.cache_hit),
+            cacheLayer: result.search_trace?.cache_layer ?? (result.from_cache ? 'server' : null),
+            cacheStats: result.cache,
+          }
+
+          if (!result.from_cache && !result.search_trace?.cache_hit) {
+            await saveCachedCoachResponse(userMessage, { profile: userProfile, goals }, result)
+            if (userId && userId !== 'local') {
+              await saveCloudCachedCoachResponse(userId, userMessage, { profile: userProfile, goals }, result)
+              recordCloudCoachCacheEvent(userId, 'save', { cache_key: result.cache?.cache_key })
+            }
+          } else if (userId && userId !== 'local') {
+            recordCloudCoachCacheEvent(userId, 'hit', {
+              cache_key: result.cache?.cache_key,
+              layer: 'server',
+            })
+          }
         }
       }
     } catch {

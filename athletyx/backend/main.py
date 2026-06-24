@@ -1,27 +1,31 @@
 """
 Athletyx HTTP API — IronLog integration + legacy chat router.
 
-- POST /api/coach — RAG + SerpAPI + personalization (IronLog IronCoach)
-- POST /api/chat — deterministic tool router (legacy)
+Production: set SUPABASE_URL, SUPABASE_ANON_KEY, REQUIRE_AUTH=true, CORS_ORIGINS
 """
 
-from fastapi import FastAPI
+from __future__ import annotations
+
+import os
+
+from dotenv import load_dotenv
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
+from backend.coaching_service import coach_with_athletyx, serpapi_available
 from backend.agent import route_message
-from backend.coaching_service import coach_with_athletyx
+from backend.auth_middleware import get_cors_origins, get_current_user
+from backend.query_cache import get_cache_stats
 
-app = FastAPI(title="Athletyx API", version="0.2.0")
+load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "PRIVATE.env"))
+
+app = FastAPI(title="Athletyx API", version="0.3.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ],
+    allow_origins=get_cors_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -55,6 +59,8 @@ class CoachResponse(BaseModel):
     search_trace: dict = Field(default_factory=dict)
     sources: dict = Field(default_factory=dict)
     tool_used: str | None = None
+    from_cache: bool | None = None
+    cache: dict = Field(default_factory=dict)
 
 
 @app.get("/health")
@@ -62,8 +68,18 @@ def health():
     return {
         "status": "ok",
         "service": "athletyx",
-        "features": ["rag", "serpapi", "personalization", "ironlog_coach"],
+        "features": ["rag", "personalization", "ironlog_coach", "jwt_auth", "query_cache"]
+        + (["serpapi"] if serpapi_available() else []),
+        "auth_required": os.getenv("REQUIRE_AUTH", "false"),
+        "web_search_available": serpapi_available(),
+        "openai_available": bool(os.getenv("OPENAI_API_KEY", "").strip()),
+        "cache": get_cache_stats(),
     }
+
+
+@app.get("/api/coach/cache-stats")
+def coach_cache_stats():
+    return get_cache_stats()
 
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -73,10 +89,16 @@ async def chat(request: ChatRequest):
 
 
 @app.post("/api/coach", response_model=CoachResponse)
-async def coach(request: CoachRequest):
+async def coach(
+    request: CoachRequest,
+    user: dict | None = Depends(get_current_user),
+):
+    profile = request.profile
+    if user:
+        profile = {**profile, "id": user.get("id"), "email": user.get("email")}
     result = await coach_with_athletyx(
         request.message,
-        request.profile,
+        profile,
         request.goals,
         request.analysis,
         use_web_search=request.use_web_search,
