@@ -48,14 +48,17 @@ async def verify_supabase_jwt(token: str) -> dict[str, Any]:
     if not url or not anon:
         raise HTTPException(status_code=503, detail="Auth not configured on server")
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        resp = await client.get(
-            f"{url}/auth/v1/user",
-            headers={"Authorization": f"Bearer {token}", "apikey": anon},
-        )
-        if resp.status_code != 200:
-            raise HTTPException(status_code=401, detail="Invalid or expired token")
-        return resp.json()
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(
+                f"{url}/auth/v1/user",
+                headers={"Authorization": f"Bearer {token}", "apikey": anon},
+            )
+            if resp.status_code != 200:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+            return resp.json()
+    except httpx.HTTPError as exc:
+        raise HTTPException(status_code=503, detail="Auth provider unavailable") from exc
 
 
 def check_rate_limit(user_id: str) -> None:

@@ -2,7 +2,7 @@
  * Post-v1: Goal Guardian push notifications via FCM/APNs.
  */
 
-export async function registerPushNotifications(_userId) {
+export async function registerPushNotifications() {
   if (!window.Capacitor?.isNativePlatform?.()) {
     return { registered: false, reason: 'web' }
   }
@@ -20,6 +20,6 @@ export async function registerPushNotifications(_userId) {
   }
 }
 
-export async function scheduleGuardianReminder(_payload) {
+export async function scheduleGuardianReminder() {
   return { scheduled: false, reason: 'server-side scheduling post-v1' }
 }

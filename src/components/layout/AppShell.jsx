@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion'
 import BottomNav from './BottomNav.jsx'
 import DynamicIsland from '../workout/DynamicIsland.jsx'
+import SyncStatusBar from './SyncStatusBar.jsx'
 
 export default function AppShell({
   activeTab,
@@ -32,6 +33,7 @@ export default function AppShell({
         />
       </motion.div>
 
+      <SyncStatusBar />
       {showIsland ? <DynamicIsland /> : null}
 
       <main

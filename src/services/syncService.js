@@ -255,19 +255,24 @@ export async function scheduleSyncAll(userId) {
 export async function processSyncQueue(userId) {
   if (!userId || userId === LOCAL_USER_ID) return
 
-  await drainSyncQueue(async (item) => {
-    if (item.type === 'full') {
-      const profile = loadProfile()
-      await pushProfileToCloud(userId, profile)
-      for (const s of loadSessions()) await pushSessionToCloud(userId, s)
-    }
-    if (item.type === 'session' && item.session) {
-      await pushSessionToCloud(userId, item.session)
-    }
-    if (item.type === 'profile' && item.profile) {
-      await pushProfileToCloud(userId, item.profile)
-    }
-  })
+  window.dispatchEvent(new CustomEvent('ironlog:sync-start'))
+  try {
+    await drainSyncQueue(async (item) => {
+      if (item.type === 'full') {
+        const profile = loadProfile()
+        await pushProfileToCloud(userId, profile)
+        for (const s of loadSessions()) await pushSessionToCloud(userId, s)
+      }
+      if (item.type === 'session' && item.session) {
+        await pushSessionToCloud(userId, item.session)
+      }
+      if (item.type === 'profile' && item.profile) {
+        await pushProfileToCloud(userId, item.profile)
+      }
+    })
+  } finally {
+    window.dispatchEvent(new CustomEvent('ironlog:sync-end'))
+  }
 }
 
 export async function requestAccountDeletion(userId) {

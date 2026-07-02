@@ -4,7 +4,9 @@ import './index.css'
 import App from './App.jsx'
 import { initSentry } from './services/sentry.js'
 import { initCapacitor } from './capacitor/init.js'
+import { validateClientEnv } from './utils/envCheck.js'
 
+validateClientEnv()
 initSentry()
 initCapacitor()
 

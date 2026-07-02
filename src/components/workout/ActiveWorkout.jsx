@@ -17,6 +17,7 @@ import {
   getSessionVolume,
 } from '../../utils/session.js'
 import { useWorkoutTimer } from '../../hooks/useWorkoutTimer.js'
+import { hapticLight, hapticSuccess } from '../../utils/haptics.js'
 import RestTimer from './RestTimer.jsx'
 
 export default function ActiveWorkout({
@@ -70,6 +71,7 @@ export default function ActiveWorkout({
     const newSet = duplicate && last ? createEmptySet(last) : createEmptySet()
     updateExercise(exIdx, { ...block, sets: [...block.sets, newSet] })
     restTimer.start(90)
+    hapticLight()
   }
 
   function updateSet(exIdx, setIdx, field, value) {
@@ -87,6 +89,7 @@ export default function ActiveWorkout({
   }
 
   function handleFinish() {
+    hapticSuccess()
     onFinish({
       ...session,
       split,

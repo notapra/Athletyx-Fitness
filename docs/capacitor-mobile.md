@@ -50,6 +50,7 @@ Rebuild after changing env: `npm run build:mobile`.
 | `@capacitor/keyboard` | Chat + workout input |
 | `@capacitor/preferences` | Island position, tokens |
 | `@capacitor/splash-screen` | Launch screen |
+| `@capacitor/haptics` | Set logged, rest complete, workout finish |
 | `@capacitor/status-bar` | Dark status bar |
 
 ## Smoke test checklist
@@ -59,4 +60,6 @@ Rebuild after changing env: `npm run build:mobile`.
 - [ ] IronCoach → answer cached on repeat question
 - [ ] Settings → export data JSON
 - [ ] Settings → request account deletion
-- [ ] Dynamic Island drags and persists position
+- [ ] Offline → amber banner shows queued changes
+- [ ] Add set → light haptic (native only)
+- [ ] Rest timer end → medium haptic

@@ -4,13 +4,15 @@
 
 let initialized = false
 
+let SentryModule = null
+
 export async function initSentry() {
   const dsn = import.meta.env.VITE_SENTRY_DSN?.trim()
   if (!dsn || initialized) return
 
   try {
-    const Sentry = await import('@sentry/react')
-    Sentry.init({
+    SentryModule = await import('@sentry/react')
+    SentryModule.init({
       dsn,
       environment: import.meta.env.MODE,
       tracesSampleRate: 0.1,
@@ -18,5 +20,11 @@ export async function initSentry() {
     initialized = true
   } catch (e) {
     console.warn('Sentry init skipped', e)
+  }
+}
+
+export function captureException(error, context) {
+  if (SentryModule?.captureException) {
+    SentryModule.captureException(error, context)
   }
 }

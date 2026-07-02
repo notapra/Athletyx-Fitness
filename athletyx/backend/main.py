@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from backend.coaching_service import coach_with_athletyx, serpapi_available
 from backend.agent import route_message
 from backend.auth_middleware import get_cors_origins, get_current_user
+from backend.logging_middleware import RequestLoggingMiddleware
 from backend.query_cache import get_cache_stats
 
 load_dotenv()
@@ -23,6 +24,7 @@ load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "PRIVATE.env"))
 
 app = FastAPI(title="Athletyx API", version="0.3.0")
 
+app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_cors_origins(),

@@ -84,3 +84,18 @@ Answers are stored at three layers (all implemented in code):
 | Cloud | `coach_query_cache` table | Signed-in users |
 
 Repeat questions skip OpenAI/SerpAPI calls when cache hits.
+
+## Step 6 — Release builds (GitHub)
+
+Tag `v*` triggers `.github/workflows/release.yml`:
+
+1. Lint + test + build web `dist/`
+2. Upload `ironlog-web-dist` artifact (set repo secrets: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_ATHLETYX_API_URL`, optional `VITE_SENTRY_DSN`)
+
+For native store builds, download the artifact or build locally:
+
+```bash
+npm run build:mobile
+```
+
+Then archive in Xcode / Android Studio as in Step 5.

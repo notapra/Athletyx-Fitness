@@ -15,6 +15,6 @@ export async function importWorkoutsFromHealth() {
   return { imported: 0, workouts: [] }
 }
 
-export async function exportWorkoutToHealth(_session) {
+export async function exportWorkoutToHealth() {
   return { exported: false }
 }

@@ -1,4 +1,5 @@
 import { useCallback, useState } from 'react'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { AppProvider } from './context/AppContext.jsx'
 import AuthGate from './components/auth/AuthGate.jsx'
@@ -117,12 +118,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AuthGate>
-        <AppProvider>
-          <AppContent />
-        </AppProvider>
-      </AuthGate>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AuthGate>
+          <AppProvider>
+            <AppContent />
+          </AppProvider>
+        </AuthGate>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }
