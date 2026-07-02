@@ -20,52 +20,18 @@ import {
   getCloudCachedCoachResponse,
   saveCloudCachedCoachResponse,
 } from './coachCache.js'
+import {
+  getChatHistory,
+  persistMessage,
+  clearChatHistory,
+} from './chatHistoryService.js'
 import { loadProfile } from '../utils/storage.js'
 import { buildCitationsFromAthletyxResponse } from '../utils/athletyxCitations.js'
 
-const CHAT_STORAGE_KEY = 'gymtracker_ai_chat_v1'
-
-const WELCOME =
-  "I'm IronCoach, your AI personal trainer. I analyze your workouts, recovery, and progression in real time — kept on track by Goal Guardian. Ask me anything about training, nutrition, or recovery."
+export { getChatHistory, persistMessage, clearChatHistory }
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function loadHistory() {
-  try {
-    const raw = localStorage.getItem(CHAT_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function saveHistory(messages) {
-  try {
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-50)))
-  } catch {
-    /* storage full */
-  }
-}
-
-export async function getChatHistory() {
-  const local = loadHistory()
-  if (local.length > 0) {
-    return local.map((m) => ({ id: m.id, role: m.role, content: m.content ?? m.message }))
-  }
-  return [{ id: 'welcome', role: 'assistant', content: WELCOME }]
-}
-
-export async function clearChatHistory() {
-  localStorage.removeItem(CHAT_STORAGE_KEY)
-}
-
-export async function persistMessage(role, content) {
-  const history = loadHistory()
-  history.push({ id: crypto.randomUUID?.() ?? `m-${history.length}`, role, content })
-  saveHistory(history)
-  return history
 }
 
 function matchKeywords(text, words) {
@@ -288,9 +254,32 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     const data = await response.json()
     draft = data.choices?.[0]?.message?.content ?? 'No response received.'
   } else if (!draft) {
-    // Simulated latency so UX feels like a model call during demos without API keys
-    await delay(800 + Math.random() * 700)
-    draft = generateCoachResponse(userMessage, analysis, contract)
+    const userProfile = profile ?? loadProfile()
+    const offlineCached = await getCachedCoachResponse(userMessage, { profile: userProfile, goals })
+    if (offlineCached.hit) {
+      draft = offlineCached.response.content
+      athletyxMeta = {
+        poweredBy: offlineCached.response.powered_by ?? 'IronCoach',
+        fromCache: true,
+        cacheLayer: 'offline',
+        searchTrace: offlineCached.response.search_trace ?? {},
+      }
+    } else {
+      await delay(800 + Math.random() * 700)
+      draft = generateCoachResponse(userMessage, analysis, contract)
+      await saveCachedCoachResponse(userMessage, { profile: userProfile, goals }, {
+        content: draft,
+        powered_by: 'IronCoach Offline',
+        search_trace: { offline: true, cache_hit: false },
+      })
+      if (userId && userId !== 'local') {
+        await saveCloudCachedCoachResponse(userId, userMessage, { profile: userProfile, goals }, {
+          content: draft,
+          powered_by: 'IronCoach Offline',
+          search_trace: { offline: true },
+        })
+      }
+    }
   }
 
   const base = {

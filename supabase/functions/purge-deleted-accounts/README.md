@@ -1,8 +1,10 @@
--- Edge function companion: scheduled purge of accounts after 30-day deletion window.
--- Deploy via Supabase CLI: supabase functions deploy purge-deleted-accounts
-
--- Manual SQL job (run daily via pg_cron or external scheduler):
--- UPDATE account_deletion_requests SET status = 'completed'
--- WHERE status = 'pending' AND scheduled_purge_at < now();
-
--- Full purge should delete auth.users via service role; see docs/production-deploy.md.
+# Deploy: supabase functions deploy purge-deleted-accounts --no-verify-jwt
+#
+# Secrets (Supabase dashboard → Edge Functions):
+#   SUPABASE_URL
+#   SUPABASE_SERVICE_ROLE_KEY
+#   CRON_SECRET          — random string; pass as Authorization: Bearer <CRON_SECRET>
+#
+# Schedule daily via Supabase cron or external scheduler:
+#   POST https://<project>.supabase.co/functions/v1/purge-deleted-accounts
+#   Authorization: Bearer <CRON_SECRET>

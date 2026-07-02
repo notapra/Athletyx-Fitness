@@ -14,10 +14,12 @@ dist-ssr
 .env
 .env.*
 !.env.example
+!.env.staging.example
 !.env.local.example
 
 # Local secrets — API keys must stay out of the public repo
 PRIVATE.env
+PRIVATE.env.staging
 athletyx.mcp/.env
 **/uploads/*.json
 

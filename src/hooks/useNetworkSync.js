@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { LOCAL_USER_ID } from '../utils/storage.js'
 import { isSupabaseConfigured } from '../services/supabaseClient.js'
 import { processSyncQueue, pullFromCloud } from '../services/syncService.js'
+import { pullChatFromCloud } from '../services/chatHistoryService.js'
 
 export function useNetworkSync(userId) {
   const [online, setOnline] = useState(
@@ -22,6 +23,7 @@ export function useNetworkSync(userId) {
       if (!online || !isSupabaseConfigured || !userId || userId === LOCAL_USER_ID) return
       try {
         await pullFromCloud(userId)
+        await pullChatFromCloud(userId)
         window.dispatchEvent(new CustomEvent('ironlog:storage-reload'))
       } catch (e) {
         console.warn('Pull failed', e)
@@ -39,10 +41,19 @@ export function useNetworkSync(userId) {
       syncPull()
       sync()
     }
+    function onNetworkEvent(e) {
+      const connected = e.detail?.connected ?? true
+      setOnline(connected)
+      if (connected) {
+        syncPull()
+        sync()
+      }
+    }
 
     window.addEventListener('online', onOnline)
     window.addEventListener('offline', onOffline)
     window.addEventListener('ironlog:foreground', onForeground)
+    window.addEventListener('ironlog:network', onNetworkEvent)
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') onForeground()
     })
@@ -52,6 +63,7 @@ export function useNetworkSync(userId) {
       window.removeEventListener('online', onOnline)
       window.removeEventListener('offline', onOffline)
       window.removeEventListener('ironlog:foreground', onForeground)
+      window.removeEventListener('ironlog:network', onNetworkEvent)
     }
   }, [online, userId])
 

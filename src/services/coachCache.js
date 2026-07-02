@@ -148,7 +148,11 @@ export async function saveCloudCachedCoachResponse(userId, message, { profile, g
     { onConflict: 'user_id,cache_key' }
   )
 
-  recordCloudCoachCacheEvent(userId, 'save', { cache_key: cacheKey.slice(0, 16), webSearchUsed })
+  recordCloudCoachCacheEvent(userId, 'save', {
+    cache_key: cacheKey.slice(0, 16),
+    webSearchUsed,
+    query: normalizeQuery(message).slice(0, 120),
+  })
 }
 
 export function recordCloudCoachCacheEvent(userId, event, payload = {}) {

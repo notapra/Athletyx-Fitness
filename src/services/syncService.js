@@ -281,11 +281,13 @@ export async function exportUserData(userId) {
   const sb = getSupabase()
   if (!sb || !userId) throw new Error('Cloud not configured')
 
-  const [profile, sessions, bodyweight, goals] = await Promise.all([
+  const [profile, sessions, bodyweight, goals, chat, coachCache] = await Promise.all([
     sb.from('profiles').select('*').eq('id', userId).single(),
     sb.from('workout_sessions').select('*').eq('user_id', userId),
     sb.from('bodyweight_logs').select('*').eq('user_id', userId),
     sb.from('goals').select('*').eq('user_id', userId),
+    sb.from('ai_chat_history').select('*').eq('user_id', userId).order('created_at'),
+    sb.from('coach_query_cache').select('*').eq('user_id', userId),
   ])
 
   return {
@@ -294,6 +296,8 @@ export async function exportUserData(userId) {
     workout_sessions: sessions.data,
     bodyweight_logs: bodyweight.data,
     goals: goals.data,
+    ai_chat_history: chat.data,
+    coach_query_cache: coachCache.data,
   }
 }
 

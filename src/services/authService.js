@@ -13,6 +13,7 @@ import {
   processSyncQueue,
   scheduleSyncAll,
 } from './syncService.js'
+import { migrateLocalChatToCloud, pullChatFromCloud } from './chatHistoryService.js'
 
 export { LOCAL_USER_ID, isSupabaseConfigured }
 
@@ -110,7 +111,9 @@ export async function resetPassword(email) {
 export async function onAuthSession(user) {
   if (!user?.id) return loadProfile()
   await migrateLocalToCloud(user.id)
+  await migrateLocalChatToCloud(user.id)
   await pullFromCloud(user.id)
+  await pullChatFromCloud(user.id)
   await processSyncQueue(user.id)
   return fetchProfile(user.id)
 }

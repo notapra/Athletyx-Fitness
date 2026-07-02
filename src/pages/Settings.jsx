@@ -21,6 +21,8 @@ import {
   fetchConsents,
   updateConsents,
 } from '../services/syncService.js'
+import { getCoachCacheStats } from '../services/coachCache.js'
+import LegalDocument from '../components/compliance/LegalDocument.jsx'
 import Card from '../components/ui/Card.jsx'
 
 const WEEKDAYS = [
@@ -52,6 +54,8 @@ export default function Settings({ onBack }) {
   const [confirmReset, setConfirmReset] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
+  const [legalView, setLegalView] = useState(null)
+  const cacheStats = getCoachCacheStats()
 
   useEffect(() => {
     if (!cloudEnabled || !userId) return
@@ -146,6 +150,10 @@ export default function Settings({ onBack }) {
       ? 'Sign in to enable cloud sync'
       : 'All data stored locally on this device'
 
+  if (legalView) {
+    return <LegalDocument docKey={legalView} onBack={() => setLegalView(null)} />
+  }
+
   return (
     <div className="space-y-5 px-4 pt-6 pb-8">
       <header className="flex items-center gap-3">
@@ -230,13 +238,12 @@ export default function Settings({ onBack }) {
             />
           </label>
           <a
-            href="https://athletyx.com/legal/ai-disclosure"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 text-xs text-cyan-400"
-          >
-            <ExternalLink className="h-3 w-3" /> How AI coaching works
-          </a>
+          href="#"
+          onClick={(e) => { e.preventDefault(); setLegalView('ai') }}
+          className="flex items-center gap-2 text-xs text-cyan-400"
+        >
+          <ExternalLink className="h-3 w-3" /> How AI coaching works
+        </a>
         </div>
       </Card>
 
@@ -248,14 +255,13 @@ export default function Settings({ onBack }) {
         <p className="mb-3 text-xs text-zinc-400">
           IronLog is not a medical device. Consult a physician before changing your exercise program.
         </p>
-        <a
-          href="https://athletyx.com/legal/health-disclaimer"
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          type="button"
+          onClick={() => setLegalView('health')}
           className="flex items-center gap-2 text-xs text-cyan-400"
         >
           <FileText className="h-3 w-3" /> Read full health disclaimer
-        </a>
+        </button>
       </Card>
 
       <Card className="border-amber-500/20">
@@ -343,13 +349,18 @@ export default function Settings({ onBack }) {
       <Card>
         <h2 className="mb-3 text-sm font-semibold text-white">Legal & data</h2>
         <div className="space-y-2 text-xs">
-          <a href="https://athletyx.com/privacy" target="_blank" rel="noopener noreferrer" className="block text-cyan-400">
+          <button type="button" onClick={() => setLegalView('privacy')} className="block text-cyan-400">
             Privacy policy
-          </a>
-          <a href="https://athletyx.com/terms" target="_blank" rel="noopener noreferrer" className="block text-cyan-400">
+          </button>
+          <button type="button" onClick={() => setLegalView('terms')} className="block text-cyan-400">
             Terms of service
-          </a>
+          </button>
         </div>
+        {cacheStats.hits || cacheStats.saves ? (
+          <p className="mt-3 text-[10px] text-zinc-500">
+            Coach cache: {cacheStats.hits ?? 0} hits · {cacheStats.saves ?? 0} saved answers
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={handleExport}

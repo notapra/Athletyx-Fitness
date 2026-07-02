@@ -24,6 +24,15 @@ cp .env.example .env
 cp PRIVATE.env.example PRIVATE.env
 ```
 
+**Staging** (separate Supabase + Railway projects):
+
+```bash
+cp .env.staging.example .env.staging.local
+cp PRIVATE.env.staging.example PRIVATE.env.staging
+```
+
+See [`docs/production-deploy.md`](docs/production-deploy.md) for Railway + Vercel staging setup.
+
 **Frontend (`.env` — safe for Vite, no secrets):**
 
 ```
@@ -80,7 +89,7 @@ npx cap open android   # Android Studio → Internal testing
 
 ## 7. Data migration & sync
 
-On first login, existing `localStorage` workouts, bodyweight, goals, and profile upload to Supabase. Duplicates are prevented via `client_id` unique constraints. Offline changes queue in IndexedDB and sync on reconnect / app foreground.
+On first login, existing `localStorage` workouts, bodyweight, goals, profile, and **IronCoach chat** upload to Supabase. Coach answers are cached in `coach_query_cache` for cross-device reuse (fewer API calls). Duplicates are prevented via `client_id` unique constraints. Offline changes queue in IndexedDB and sync on reconnect / app foreground.
 
 ## 8. Security
 
