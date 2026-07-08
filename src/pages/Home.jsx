@@ -84,6 +84,7 @@ export default function Home({ onStartWorkout }) {
 
       <motion.button
         type="button"
+        data-testid="start-workout"
         whileTap={{ scale: 0.98 }}
         onClick={handleQuickStart}
         className="flex w-full items-center justify-between rounded-3xl bg-gradient-to-r from-emerald-400 via-emerald-500 to-cyan-400 p-5 shadow-2xl shadow-emerald-500/25"

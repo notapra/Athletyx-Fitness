@@ -177,6 +177,7 @@ export default function Profile() {
         </div>
         <button
           type="button"
+          data-testid="open-settings"
           onClick={() => setShowSettings(true)}
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-800 text-zinc-400"
         >

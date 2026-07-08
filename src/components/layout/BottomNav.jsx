@@ -22,6 +22,7 @@ export default function BottomNav({ activeTab, onTabChange }) {
             <button
               key={id}
               type="button"
+              data-testid={`nav-${id}`}
               onClick={() => onTabChange(id)}
               className="relative flex min-h-[52px] min-w-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 transition-colors active:scale-95"
             >

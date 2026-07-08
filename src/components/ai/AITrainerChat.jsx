@@ -193,6 +193,7 @@ export default function AITrainerChat({ analysis }) {
       <div className="border-t border-zinc-800/80 px-3 py-3">
         <button
           type="button"
+          data-testid="refocus-goals"
           onClick={() => handleSend('', true)}
           disabled={isTyping}
           className="mb-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 py-2 text-xs font-semibold text-amber-200 transition hover:bg-amber-500/15 disabled:opacity-50"

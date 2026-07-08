@@ -110,6 +110,7 @@ export default function ActiveWorkout({
       <header className="safe-top flex items-center justify-between border-b border-zinc-800/80 px-4 pb-3 pt-14 backdrop-blur-xl">
         <button
           type="button"
+          data-testid="cancel-workout"
           onClick={onCancel}
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-800 text-zinc-400"
         >
@@ -123,6 +124,7 @@ export default function ActiveWorkout({
         </div>
         <button
           type="button"
+          data-testid="finish-workout"
           onClick={handleFinish}
           className="flex h-10 items-center gap-1.5 rounded-2xl bg-emerald-500 px-3 text-sm font-bold text-zinc-950"
         >
@@ -313,6 +315,7 @@ export default function ActiveWorkout({
 
       <motion.button
         type="button"
+        data-testid="add-exercise-fab"
         whileTap={{ scale: 0.95 }}
         onClick={() => setShowExercisePicker(true)}
         className="safe-bottom fixed bottom-6 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 text-zinc-950 shadow-2xl shadow-emerald-500/30"

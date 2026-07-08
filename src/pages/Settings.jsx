@@ -159,6 +159,7 @@ export default function Settings({ onBack }) {
       <header className="flex items-center gap-3">
         <button
           type="button"
+          data-testid="settings-back"
           onClick={onBack}
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-800 text-zinc-400"
         >

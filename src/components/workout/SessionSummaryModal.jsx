@@ -51,6 +51,7 @@ export default function SessionSummaryModal({ open, summary, guardianNote, onClo
 
         <button
           type="button"
+          data-testid="summary-done"
           onClick={onClose}
           className="w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-cyan-400 py-3.5 text-sm font-bold text-zinc-950 transition active:scale-[0.98]"
         >
