@@ -7,6 +7,7 @@ Shipped feature plans (completed work) live here in git. **Future / backlog plan
 | **01** | [IronLog: Dynamic Island + sub-muscle heat map](./01-ironlog-dynamic-island-sub-muscle-heat-map.plan.md) | Completed | `subMuscles.js`, `exerciseSubMuscleMap.js`, `DynamicIsland.jsx`, `AnatomicalBodyMap.jsx`, Home heat map |
 | **02** | [Athletyx monorepo scaffold](./02-athletyx-monorepo-scaffold.plan.md) | Completed | `athletyx/tools/`, FastAPI backend, Next.js chat UI |
 | **03** | [Goal Guardian supervisor AI](./03-goal-guardian-supervisor-ai.plan.md) | Completed | Goal contract, drift detection, capped reminders, Supabase tables |
+| **04** | [Production launch and operations](./04-production-launch-and-operations.plan.md) | Planned | PR workflow, staging deploy, CI gates, mobile smoke checks, rollback readiness |
 
 ## Future notes (local only)
 
@@ -26,5 +27,6 @@ These files are for personal roadmap / agent context on your machine, not the pu
 | `01-...plan.md` | `ironlog_muscle_ui_45dcfc8b` |
 | `02-...plan.md` | `athletyx_monorepo_scaffold_80489b4c` |
 | `03-...plan.md` | `goal_guardian_ai_3865e245` |
+| `04-...plan.md` | `production_launch_and_ops_stage_04` |
 
-Completed plans (**01–03**) stay in **`docs/plans/`** on GitHub. Future planning uses the gitignored folders above.
+Plans (**01–04**) stay in **`docs/plans/`** on GitHub (completed or active stage plans). Future/backlog planning uses the gitignored folders above.
