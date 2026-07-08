@@ -20,7 +20,10 @@ blob-report
 !.env.staging.example
 !.env.local.example
 
-# Local secrets — API keys must stay out of the public repo
+# Local / future planning (gitignored)
+
+docs/plans/future/
+.cursor/plans/
 PRIVATE.env
 PRIVATE.env.staging
 athletyx.mcp/.env
