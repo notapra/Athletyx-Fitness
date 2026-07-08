@@ -17,14 +17,16 @@ import {
 import { migrateLegacyWorkout } from '../utils/session.js'
 import { enqueueSyncOp, drainSyncQueue } from './offlineQueue.js'
 
-const MIGRATION_KEY = 'ironlog_cloud_migrated_v1'
+const MIGRATION_KEY_PREFIX = 'ironlog_cloud_migrated_v1:'
 
-export function isCloudMigrated() {
-  return localStorage.getItem(MIGRATION_KEY) === 'true'
+export function isCloudMigrated(userId) {
+  if (!userId) return false
+  return localStorage.getItem(`${MIGRATION_KEY_PREFIX}${userId}`) === 'true'
 }
 
-function markCloudMigrated() {
-  localStorage.setItem(MIGRATION_KEY, 'true')
+function markCloudMigrated(userId) {
+  if (!userId) return
+  localStorage.setItem(`${MIGRATION_KEY_PREFIX}${userId}`, 'true')
 }
 
 function profileToRow(profile, userId) {
@@ -147,7 +149,7 @@ async function sessionFromRow(sb, row) {
 
 export async function migrateLocalToCloud(userId) {
   const sb = getSupabase()
-  if (!sb || !userId || isCloudMigrated()) return { migrated: false }
+  if (!sb || !userId || isCloudMigrated(userId)) return { migrated: false }
 
   const profile = loadProfile()
   await sb.from('profiles').upsert(profileToRow(profile, userId))
@@ -182,7 +184,7 @@ export async function migrateLocalToCloud(userId) {
     )
   }
 
-  markCloudMigrated()
+  markCloudMigrated(userId)
   return { migrated: true }
 }
 

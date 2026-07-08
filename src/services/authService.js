@@ -17,6 +17,8 @@ import { migrateLocalChatToCloud, pullChatFromCloud } from './chatHistoryService
 
 export { LOCAL_USER_ID, isSupabaseConfigured }
 
+const LAST_AUTH_USER_KEY = 'ironlog_last_auth_user_v1'
+
 export async function fetchProfile(userId = LOCAL_USER_ID) {
   if (!isSupabaseConfigured || userId === LOCAL_USER_ID) {
     return loadProfile()
@@ -110,11 +112,25 @@ export async function resetPassword(email) {
 
 export async function onAuthSession(user) {
   if (!user?.id) return loadProfile()
-  await migrateLocalToCloud(user.id)
+
+  const previousUserId = localStorage.getItem(LAST_AUTH_USER_KEY)
+  const switchingUsers = Boolean(previousUserId && previousUserId !== user.id)
+
+  if (switchingUsers) {
+    // Prevent leaking prior account's local snapshot into another account.
+    clearAllAppData()
+    saveProfile(getDefaultProfile())
+  }
+
+  if (!switchingUsers) {
+    await migrateLocalToCloud(user.id)
+  }
+
   await migrateLocalChatToCloud(user.id)
   await pullFromCloud(user.id)
   await pullChatFromCloud(user.id)
   await processSyncQueue(user.id)
+  localStorage.setItem(LAST_AUTH_USER_KEY, user.id)
   return fetchProfile(user.id)
 }
 

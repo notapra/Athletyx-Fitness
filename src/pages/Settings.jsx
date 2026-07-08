@@ -383,10 +383,20 @@ export default function Settings({ onBack }) {
 
       {cloudEnabled ? (
         <Card>
+          <p className="mb-3 text-xs text-zinc-500">
+            Signed in as <span className="text-zinc-300">{profile?.email ?? profile?.username}</span>
+          </p>
           <button
             type="button"
             onClick={() => signOut()}
-            className="flex w-full items-center gap-2 text-sm font-semibold text-zinc-300"
+            className="flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-700 py-3 text-sm font-semibold text-zinc-200"
+          >
+            <LogOut className="h-4 w-4" /> Switch account
+          </button>
+          <button
+            type="button"
+            onClick={() => signOut()}
+            className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl border border-red-500/30 py-3 text-sm font-semibold text-red-300"
           >
             <LogOut className="h-4 w-4" /> Sign out
           </button>

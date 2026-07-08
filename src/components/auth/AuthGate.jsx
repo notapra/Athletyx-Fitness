@@ -4,14 +4,14 @@ import LoginPage from '../../pages/Login.jsx'
 import SignUpPage from '../../pages/SignUp.jsx'
 import ComplianceOnboarding from '../compliance/ComplianceOnboarding.jsx'
 
-const ONBOARDING_KEY = 'ironlog_compliance_accepted_v1'
+const ONBOARDING_KEY_PREFIX = 'ironlog_compliance_accepted_v1:'
 
 export default function AuthGate({ children }) {
-  const { isConfigured, isAuthenticated, loading, migrating } = useAuth()
+  const { isConfigured, isAuthenticated, loading, migrating, userId } = useAuth()
+  const onboardingKey = `${ONBOARDING_KEY_PREFIX}${userId ?? 'anonymous'}`
   const [mode, setMode] = useState('login')
-  const [onboardingDone, setOnboardingDone] = useState(
-    () => localStorage.getItem(ONBOARDING_KEY) === 'true'
-  )
+  const [, bumpOnboardingRefresh] = useState(0)
+  const onboardingDone = localStorage.getItem(onboardingKey) === 'true'
 
   if (!isConfigured) return children
 
@@ -35,8 +35,8 @@ export default function AuthGate({ children }) {
     return (
       <ComplianceOnboarding
         onComplete={() => {
-          localStorage.setItem(ONBOARDING_KEY, 'true')
-          setOnboardingDone(true)
+          localStorage.setItem(onboardingKey, 'true')
+          bumpOnboardingRefresh((v) => v + 1)
         }}
       />
     )
