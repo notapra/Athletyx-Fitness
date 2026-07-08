@@ -21,9 +21,9 @@ function profileFingerprint(profile, goals = []) {
     profile?.experience_level ?? '',
     profile?.units ?? 'lbs',
     profile?.age ?? '',
-    [...(pf.injuries ?? [])].sort().join(','),
+    [...(pf.injury_history ?? pf.injuries ?? [])].sort().join(','),
     [...(pf.movement_restrictions ?? [])].sort().join(','),
-    pf.effort_level ?? '',
+    pf.max_effort_level ?? pf.effort_level ?? '',
     goals?.length ?? 0,
   ].join('|')
 }

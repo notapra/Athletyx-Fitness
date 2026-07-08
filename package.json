@@ -12,6 +12,8 @@
     "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",
     "lint": "eslint src",
+    "test": "python -m pytest athletyx/backend/tests -q",
+    "test:api": "node scripts/smoke-test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

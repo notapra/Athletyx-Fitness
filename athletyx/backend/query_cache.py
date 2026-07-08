@@ -43,9 +43,9 @@ def _profile_fingerprint(profile: dict | None, goals: list | None) -> str:
         str(p.get("experience_level") or ""),
         str(p.get("units") or "lbs"),
         str(p.get("age") or ""),
-        ",".join(sorted(pf.get("injuries") or [])),
+        ",".join(sorted(pf.get("injury_history") or pf.get("injuries") or [])),
         ",".join(sorted(pf.get("movement_restrictions") or [])),
-        str(pf.get("effort_level") or ""),
+        str(pf.get("max_effort_level") or pf.get("effort_level") or ""),
         str(len(goals or [])),
     ]
     return "|".join(parts)

@@ -115,7 +115,7 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
 
   if (refocusGoals && contract) {
     return {
-      content: buildRefocusedReply(contract, analysis),
+      content: buildRefocusedReply(contract),
       driftScore: 0,
       guardianNote: null,
       warningLevel: null,

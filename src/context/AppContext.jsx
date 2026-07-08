@@ -18,7 +18,12 @@ import { buildGoalContract } from '../utils/goalContract.js'
 import { maybePostWorkoutReminder } from '../services/guardianService.js'
 import { dismissReminder } from '../utils/reminderScheduler.js'
 import { isSupabaseConfigured } from '../services/authService.js'
-import { pushSessionToCloud, scheduleSyncAll, pullFromCloud } from '../services/syncService.js'
+import {
+  pushSessionToCloud,
+  deleteSessionFromCloud,
+  scheduleSyncAll,
+  pullFromCloud,
+} from '../services/syncService.js'
 import { enqueueSyncOp } from '../services/offlineQueue.js'
 import { useNetworkSync } from '../hooks/useNetworkSync.js'
 
@@ -102,9 +107,17 @@ export function AppProvider({ children }) {
     setGuardianReminder(null)
   }, [guardianReminder, effectiveUserId])
 
-  const deleteSession = useCallback((id) => {
-    setSessions((prev) => prev.filter((s) => s.id !== id))
-  }, [])
+  const deleteSession = useCallback(
+    (id) => {
+      setSessions((prev) => prev.filter((s) => s.id !== id))
+      if (cloudEnabled) {
+        enqueueSyncOp({ type: 'delete_session', userId: effectiveUserId, clientId: id }).then(() =>
+          deleteSessionFromCloud(effectiveUserId, id)
+        )
+      }
+    },
+    [cloudEnabled, effectiveUserId]
+  )
 
   const logBodyweight = useCallback((weight, date = new Date().toISOString()) => {
     const entry = { id: createId(), weight: Number(weight), date }

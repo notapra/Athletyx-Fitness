@@ -107,6 +107,18 @@ export default function Profile() {
     setRestrictionInput('')
   }
 
+  async function handleRemoveInjury(index) {
+    await savePersonalFactors({
+      injury_history: personalFactors.injury_history.filter((_, i) => i !== index),
+    })
+  }
+
+  async function handleRemoveRestriction(index) {
+    await savePersonalFactors({
+      movement_restrictions: personalFactors.movement_restrictions.filter((_, i) => i !== index),
+    })
+  }
+
   async function handleAddConstraint(e) {
     e.preventDefault()
     const text = constraintInput.trim()
@@ -294,8 +306,11 @@ export default function Profile() {
         {personalFactors.injury_history.length > 0 ? (
           <ul className="mb-2 space-y-1">
             {personalFactors.injury_history.map((item, i) => (
-              <li key={i} className="text-xs text-zinc-400">
-                • {item}
+              <li key={i} className="flex items-center justify-between rounded-xl bg-zinc-950/50 px-3 py-2 text-xs text-zinc-400">
+                <span>• {item}</span>
+                <button type="button" onClick={() => handleRemoveInjury(i)} className="text-red-400/70">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </li>
             ))}
           </ul>
@@ -314,8 +329,11 @@ export default function Profile() {
         {personalFactors.movement_restrictions.length > 0 ? (
           <ul className="mt-2 space-y-1">
             {personalFactors.movement_restrictions.map((item, i) => (
-              <li key={i} className="text-xs text-amber-200/80">
-                • {item}
+              <li key={i} className="flex items-center justify-between rounded-xl bg-zinc-950/50 px-3 py-2 text-xs text-amber-200/80">
+                <span>• {item}</span>
+                <button type="button" onClick={() => handleRemoveRestriction(i)} className="text-red-400/70">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
               </li>
             ))}
           </ul>

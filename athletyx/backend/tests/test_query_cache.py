@@ -47,6 +47,18 @@ def test_different_profile_misses_cache():
     assert meta["cache_hit"] is False
 
 
+def test_injury_history_affects_cache_key():
+    base = {"fitness_goal": "strength", "units": "lbs"}
+    with_injury = {
+        "fitness_goal": "strength",
+        "units": "lbs",
+        "ai_preferences": {"personal_factors": {"injury_history": ["shoulder impingement"]}},
+    }
+    k1 = make_cache_key("test", base, [])
+    k2 = make_cache_key("test", with_injury, [])
+    assert k1 != k2
+
+
 def test_make_cache_key_stable():
     k1 = make_cache_key("Hello", {"fitness_goal": "x"}, [])
     k2 = make_cache_key("  hello  ", {"fitness_goal": "x"}, [])

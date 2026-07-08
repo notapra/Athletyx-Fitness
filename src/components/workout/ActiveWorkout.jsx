@@ -15,6 +15,7 @@ import {
   createEmptySet,
   formatDuration,
   getSessionVolume,
+  sessionHasValidSets,
 } from '../../utils/session.js'
 import { useWorkoutTimer } from '../../hooks/useWorkoutTimer.js'
 import { hapticLight, hapticSuccess } from '../../utils/haptics.js'
@@ -32,6 +33,7 @@ export default function ActiveWorkout({
   const [exerciseQuery, setExerciseQuery] = useState('')
   const [split, setSplit] = useState(session.split ?? 'Upper')
   const [notes, setNotes] = useState(session.notes ?? '')
+  const [finishHint, setFinishHint] = useState('')
 
   const elapsed = useWorkoutTimer(session.startedAt, true)
   const suggestions = useMemo(
@@ -89,6 +91,11 @@ export default function ActiveWorkout({
   }
 
   function handleFinish() {
+    if (!sessionHasValidSets(session)) {
+      setFinishHint('Log at least one set with weight and reps before finishing.')
+      return
+    }
+    setFinishHint('')
     hapticSuccess()
     onFinish({
       ...session,
@@ -123,6 +130,12 @@ export default function ActiveWorkout({
           Finish
         </button>
       </header>
+
+      {finishHint ? (
+        <p className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-200">
+          {finishHint}
+        </p>
+      ) : null}
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="mb-4 flex gap-2 overflow-x-auto no-scrollbar">

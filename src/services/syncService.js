@@ -247,6 +247,23 @@ export async function pushSessionToCloud(userId, session) {
   await upsertSession(sb, userId, session)
 }
 
+export async function deleteSessionFromCloud(userId, clientId) {
+  const sb = getSupabase()
+  if (!sb || !userId || !clientId) return
+
+  const { data } = await sb
+    .from('workout_sessions')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('client_id', clientId)
+    .maybeSingle()
+
+  if (data?.id) {
+    const { error } = await sb.from('workout_sessions').delete().eq('id', data.id)
+    if (error) throw error
+  }
+}
+
 export async function scheduleSyncAll(userId) {
   if (!userId || userId === LOCAL_USER_ID) return
   await enqueueSyncOp({ type: 'full', userId })
@@ -265,6 +282,9 @@ export async function processSyncQueue(userId) {
       }
       if (item.type === 'session' && item.session) {
         await pushSessionToCloud(userId, item.session)
+      }
+      if (item.type === 'delete_session' && item.clientId) {
+        await deleteSessionFromCloud(userId, item.clientId)
       }
       if (item.type === 'profile' && item.profile) {
         await pushProfileToCloud(userId, item.profile)

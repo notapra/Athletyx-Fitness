@@ -46,7 +46,10 @@ function AppContent() {
       if (!sessionHasValidSets(session)) return
       const ok = finishWorkout(session)
       if (ok) {
-        const summary = getSessionSummary(session, [...sessions, session])
+        const allSessions = sessions.some((s) => s.id === session.id)
+          ? sessions.map((s) => (s.id === session.id ? session : s))
+          : [session, ...sessions]
+        const summary = getSessionSummary(session, allSessions)
         setSessionSummary(summary)
         setShowSummary(true)
       }
