@@ -9,14 +9,16 @@ from __future__ import annotations
 import os
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
 from backend.coaching_service import coach_with_athletyx, serpapi_available
 from backend.agent import route_message
 from backend.auth_middleware import get_cors_origins, get_current_user
 from backend.logging_middleware import RequestLoggingMiddleware
+from backend.mcp_auth import build_mcp_session_payload
 from backend.query_cache import get_cache_stats
 
 load_dotenv()
@@ -70,7 +72,7 @@ def health():
     return {
         "status": "ok",
         "service": "athletyx",
-        "features": ["rag", "personalization", "ironlog_coach", "jwt_auth", "query_cache"]
+        "features": ["rag", "personalization", "ironlog_coach", "jwt_auth", "query_cache", "mcp_session"]
         + (["serpapi"] if serpapi_available() else []),
         "auth_required": os.getenv("REQUIRE_AUTH", "false"),
         "web_search_available": serpapi_available(),
@@ -88,6 +90,31 @@ def coach_cache_stats():
 async def chat(request: ChatRequest):
     result = route_message(request.message)
     return ChatResponse(**result)
+
+
+_bearer_optional = HTTPBearer(auto_error=False)
+
+
+@app.get("/api/mcp/session")
+async def mcp_session(
+    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_optional),
+    user: dict | None = Depends(get_current_user),
+):
+    """
+    Per-user MCP configuration (Phase 3).
+    Requires Bearer Supabase JWT when REQUIRE_AUTH=true.
+    """
+    if user is None:
+        if os.getenv("REQUIRE_AUTH", "false").lower() in ("1", "true", "yes"):
+            raise HTTPException(status_code=401, detail="Authorization required")
+        raise HTTPException(
+            status_code=400,
+            detail="MCP session requires authentication. Set REQUIRE_AUTH=true in production.",
+        )
+    token = creds.credentials if creds else ""
+    if not token:
+        raise HTTPException(status_code=401, detail="Bearer token required for MCP session")
+    return build_mcp_session_payload(user, token)
 
 
 @app.post("/api/coach", response_model=CoachResponse)

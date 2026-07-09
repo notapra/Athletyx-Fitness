@@ -531,3 +531,26 @@ def fetch_audit_log(user_id: int, limit: int = 50) -> list[AuditEntry]:
         data["created_at"] = _iso(data.get("created_at"))
         entries.append(AuditEntry.model_validate(data))
     return entries
+
+
+# Phase 3: swap to Supabase PostgREST backend (UUID profiles + RLS via JWT).
+if os.getenv("ATHLETYX_DB_BACKEND", "local").lower() == "supabase":
+    from db_supabase import (  # noqa: E402,F401
+        build_goal_contract,
+        complete_goal,
+        create_goal,
+        create_workout_session,
+        fetch_active_goals,
+        fetch_audit_log,
+        fetch_consents,
+        fetch_personalization_context,
+        fetch_user_by_email,
+        fetch_user_by_id,
+        fetch_users_by_profile,
+        fetch_workout_session_detail,
+        fetch_workout_sessions,
+        log_exercise_sets,
+        record_audit,
+        update_user_preferences,
+        upsert_consents,
+    )

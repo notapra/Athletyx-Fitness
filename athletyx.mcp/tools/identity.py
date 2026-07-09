@@ -165,7 +165,7 @@ def register(mcp) -> None:
         )
 
     @mcp.tool()
-    def get_user_by_id(user_id: int) -> dict:
+    def get_user_by_id(user_id: str | int) -> dict:
         """Lookup user by ID. Self or admin only."""
 
         def _run():

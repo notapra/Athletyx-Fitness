@@ -11,6 +11,8 @@ import {
   Download,
   LogOut,
   ExternalLink,
+  Plug,
+  Copy,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import { useApp } from '../hooks/useApp.js'
@@ -22,6 +24,7 @@ import {
   updateConsents,
 } from '../services/syncService.js'
 import { getCoachCacheStats } from '../services/coachCache.js'
+import { buildCursorMcpJson, fetchMcpSession } from '../services/mcpService.js'
 import LegalDocument from '../components/compliance/LegalDocument.jsx'
 import Card from '../components/ui/Card.jsx'
 
@@ -55,6 +58,8 @@ export default function Settings({ onBack }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [legalView, setLegalView] = useState(null)
+  const [mcpSession, setMcpSession] = useState(null)
+  const [mcpLoading, setMcpLoading] = useState(false)
   const cacheStats = getCoachCacheStats()
 
   useEffect(() => {
@@ -105,6 +110,33 @@ export default function Settings({ onBack }) {
     await refreshProfile()
     setConfirmReset(false)
     onBack?.()
+  }
+
+  async function handleLoadMcpConfig() {
+    setMcpLoading(true)
+    setStatusMsg('')
+    try {
+      const session = await fetchMcpSession()
+      setMcpSession(session)
+      setStatusMsg('MCP config loaded — copy into Cursor or Claude Desktop')
+    } catch (e) {
+      setMcpSession(null)
+      setStatusMsg(e.message)
+    } finally {
+      setMcpLoading(false)
+    }
+  }
+
+  async function handleCopyMcpConfig() {
+    if (!mcpSession) return
+    const examplePath = 'path/to/athletyx.mcp/server.py'
+    const json = JSON.stringify(buildCursorMcpJson(mcpSession, examplePath), null, 2)
+    try {
+      await navigator.clipboard.writeText(json)
+      setStatusMsg('MCP JSON copied — replace server.py path with your machine path')
+    } catch {
+      setStatusMsg('Could not copy to clipboard')
+    }
   }
 
   async function handleExport() {
@@ -380,6 +412,43 @@ export default function Settings({ onBack }) {
           </button>
         ) : null}
       </Card>
+
+      {cloudEnabled ? (
+        <Card className="border-cyan-500/20">
+          <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
+            <Plug className="h-4 w-4 text-cyan-400" />
+            MCP access (your account only)
+          </h2>
+          <p className="mb-4 text-xs text-zinc-500">
+            Connect Cursor or Claude Desktop to your personal Athletyx MCP servers. Your Supabase
+            session token scopes tools to your data only — never share this config.
+          </p>
+          <button
+            type="button"
+            onClick={handleLoadMcpConfig}
+            disabled={mcpLoading}
+            className="w-full rounded-2xl border border-cyan-500/30 py-3 text-sm font-semibold text-cyan-200"
+          >
+            {mcpLoading ? 'Loading…' : 'Load my MCP configuration'}
+          </button>
+          {mcpSession ? (
+            <div className="mt-3 space-y-2 text-xs text-zinc-400">
+              <p>
+                User: <span className="text-zinc-200">{mcpSession.email}</span> ·{' '}
+                {mcpSession.domains?.length ?? 0} domain servers
+              </p>
+              <p className="text-zinc-500">{mcpSession.instructions}</p>
+              <button
+                type="button"
+                onClick={handleCopyMcpConfig}
+                className="flex w-full items-center justify-center gap-2 rounded-2xl bg-cyan-500/10 py-2.5 text-sm text-cyan-300"
+              >
+                <Copy className="h-4 w-4" /> Copy Cursor mcp.json snippet
+              </button>
+            </div>
+          ) : null}
+        </Card>
+      ) : null}
 
       {cloudEnabled ? (
         <Card>

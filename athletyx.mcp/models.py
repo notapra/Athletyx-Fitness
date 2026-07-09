@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+from mcp_types import RecordId, UserId
+
 
 class PersonalFactors(BaseModel):
     """Injury, effort, and recovery profile for safe personalized coaching."""
@@ -21,7 +23,7 @@ class PersonalFactors(BaseModel):
 class User(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: int
+    id: UserId
     name: str
     email: str
     fitness_goal: str
@@ -47,16 +49,16 @@ class UserListResult(BaseModel):
 
 
 class Goal(BaseModel):
-    id: int
-    user_id: int
+    id: RecordId
+    user_id: UserId
     title: str
     target: str | None = None
     completed: bool = False
 
 
 class WorkoutSessionSummary(BaseModel):
-    id: int
-    user_id: int
+    id: RecordId
+    user_id: UserId
     split: str
     duration: int
     notes: str
@@ -72,7 +74,7 @@ class SetRecord(BaseModel):
 
 
 class ExerciseEntryDetail(BaseModel):
-    id: int
+    id: RecordId
     exercise_name: str
     muscle_group: str | None = None
     sets: list[SetRecord] = Field(default_factory=list)
@@ -101,7 +103,7 @@ class GoalContract(BaseModel):
 
 
 class AuditEntry(BaseModel):
-    id: int
+    id: RecordId
     action: str
     resource: str | None = None
     payload: dict = Field(default_factory=dict)

@@ -106,13 +106,41 @@ Clients pass the authenticated user via environment variable:
 
 ---
 
-## Phase 3 — Production hardening
+## Phase 3 — Production hardening (in progress)
 
-- OAuth / JWT instead of `ATHLETYX_USER_ID` env
-- Read replica for agent queries
-- Rate limits per user
-- Separate MCP servers by domain (stay under ~40 tools per client)
-- Supabase RLS alignment with `public.profiles` UUID schema
+| Item | Status |
+|------|--------|
+| OAuth / JWT instead of `ATHLETYX_USER_ID` env | **Implemented** — `MCP_REQUIRE_AUTH` + `ATHLETYX_MCP_JWT` |
+| Rate limits per user | **Implemented** — `MCP_RATE_LIMIT_PER_HOUR` (default 120/hr) |
+| Separate MCP servers by domain | **Implemented** — `ATHLETYX_MCP_DOMAIN` + Settings → MCP access |
+| Supabase RLS alignment with `public.profiles` UUID | **Implemented** — `ATHLETYX_DB_BACKEND=supabase` + PostgREST JWT |
+| Read replica for agent queries | Planned |
+
+### Production MCP env (per user)
+
+```json
+"env": {
+  "MCP_REQUIRE_AUTH": "true",
+  "ATHLETYX_DB_BACKEND": "supabase",
+  "ATHLETYX_MCP_JWT": "<supabase access token from IronLog Settings>",
+  "ATHLETYX_MCP_DOMAIN": "identity",
+  "SUPABASE_URL": "https://YOUR_PROJECT.supabase.co",
+  "SUPABASE_ANON_KEY": "YOUR_ANON_KEY"
+}
+```
+
+Load domain-specific configs from **IronLog → Settings → MCP access** or `GET /api/mcp/session` (Bearer JWT).
+
+Legacy dev (local integer `users` table):
+
+```json
+"env": {
+  "ATHLETYX_USER_ID": "1",
+  "ATHLETYX_DB_BACKEND": "local",
+  "DB_HOST": "localhost",
+  "DB_PORT": "5433"
+}
+```
 
 ---
 
