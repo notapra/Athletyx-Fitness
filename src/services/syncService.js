@@ -14,6 +14,12 @@ import {
   saveProfile,
   LOCAL_USER_ID,
 } from '../utils/storage.js'
+import {
+  loadFoodCatalog,
+  saveFoodCatalog,
+  loadNutritionLogs,
+  saveNutritionLogs,
+} from '../utils/nutritionStorage.js'
 import { migrateLegacyWorkout } from '../utils/session.js'
 import { enqueueSyncOp, drainSyncQueue } from './offlineQueue.js'
 
@@ -184,6 +190,14 @@ export async function migrateLocalToCloud(userId) {
     )
   }
 
+  for (const food of loadFoodCatalog()) {
+    await pushFoodToCloud(userId, food)
+  }
+
+  for (const entry of loadNutritionLogs()) {
+    await pushNutritionLogToCloud(userId, entry)
+  }
+
   markCloudMigrated(userId)
   return { migrated: true }
 }
@@ -235,6 +249,40 @@ export async function pullFromCloud(userId) {
       }))
     )
   }
+
+  const { data: foodRows } = await sb.from('food_items').select('*').eq('user_id', userId)
+  if (foodRows?.length) {
+    saveFoodCatalog(
+      foodRows.map((r) => ({
+        id: r.client_id ?? r.id,
+        fdc_id: r.fdc_id,
+        name: r.name,
+        brand: r.brand ?? '',
+        source: r.source ?? 'saved',
+        nutrients_per_100g: r.nutrients_per_100g ?? {},
+        created_at: r.created_at,
+      }))
+    )
+  }
+
+  const { data: logRows } = await sb
+    .from('nutrition_log_entries')
+    .select('*')
+    .eq('user_id', userId)
+    .order('logged_at', { ascending: false })
+
+  if (logRows?.length) {
+    saveNutritionLogs(
+      logRows.map((r) => ({
+        id: r.client_id ?? r.id,
+        food_id: r.food_client_id,
+        grams: Number(r.grams),
+        meal: r.meal,
+        date: r.log_date,
+        logged_at: r.logged_at,
+      }))
+    )
+  }
 }
 
 export async function pushProfileToCloud(userId, profile) {
@@ -266,6 +314,53 @@ export async function deleteSessionFromCloud(userId, clientId) {
   }
 }
 
+export async function pushFoodToCloud(userId, food) {
+  const sb = getSupabase()
+  if (!sb || !userId || !food) return
+  await sb.from('food_items').upsert(
+    {
+      user_id: userId,
+      client_id: food.id,
+      fdc_id: food.fdc_id ?? null,
+      name: food.name,
+      brand: food.brand ?? '',
+      source: food.source ?? 'saved',
+      nutrients_per_100g: food.nutrients_per_100g ?? {},
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,client_id' }
+  )
+}
+
+export async function pushNutritionLogToCloud(userId, entry) {
+  const sb = getSupabase()
+  if (!sb || !userId || !entry) return
+  await sb.from('nutrition_log_entries').upsert(
+    {
+      user_id: userId,
+      client_id: entry.id,
+      food_client_id: entry.food_id,
+      grams: entry.grams,
+      meal: entry.meal ?? 'snack',
+      log_date: entry.date,
+      logged_at: entry.logged_at ?? new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,client_id' }
+  )
+}
+
+export async function deleteNutritionLogFromCloud(userId, clientId) {
+  const sb = getSupabase()
+  if (!sb || !userId || !clientId) return
+  const { error } = await sb
+    .from('nutrition_log_entries')
+    .delete()
+    .eq('user_id', userId)
+    .eq('client_id', clientId)
+  if (error) throw error
+}
+
 export async function scheduleSyncAll(userId) {
   if (!userId || userId === LOCAL_USER_ID) return
   await enqueueSyncOp({ type: 'full', userId })
@@ -281,6 +376,8 @@ export async function processSyncQueue(userId) {
         const profile = loadProfile()
         await pushProfileToCloud(userId, profile)
         for (const s of loadSessions()) await pushSessionToCloud(userId, s)
+        for (const f of loadFoodCatalog()) await pushFoodToCloud(userId, f)
+        for (const e of loadNutritionLogs()) await pushNutritionLogToCloud(userId, e)
       }
       if (item.type === 'session' && item.session) {
         await pushSessionToCloud(userId, item.session)
@@ -290,6 +387,15 @@ export async function processSyncQueue(userId) {
       }
       if (item.type === 'profile' && item.profile) {
         await pushProfileToCloud(userId, item.profile)
+      }
+      if (item.type === 'food' && item.food) {
+        await pushFoodToCloud(userId, item.food)
+      }
+      if (item.type === 'nutrition_log' && item.entry) {
+        await pushNutritionLogToCloud(userId, item.entry)
+      }
+      if (item.type === 'delete_nutrition_log' && item.clientId) {
+        await deleteNutritionLogFromCloud(userId, item.clientId)
       }
     })
   } finally {
@@ -308,13 +414,16 @@ export async function exportUserData(userId) {
   const sb = getSupabase()
   if (!sb || !userId) throw new Error('Cloud not configured')
 
-  const [profile, sessions, bodyweight, goals, chat, coachCache] = await Promise.all([
+  const [profile, sessions, bodyweight, goals, chat, coachCache, foods, nutritionLogs] =
+    await Promise.all([
     sb.from('profiles').select('*').eq('id', userId).single(),
     sb.from('workout_sessions').select('*').eq('user_id', userId),
     sb.from('bodyweight_logs').select('*').eq('user_id', userId),
     sb.from('goals').select('*').eq('user_id', userId),
     sb.from('ai_chat_history').select('*').eq('user_id', userId).order('created_at'),
     sb.from('coach_query_cache').select('*').eq('user_id', userId),
+    sb.from('food_items').select('*').eq('user_id', userId),
+    sb.from('nutrition_log_entries').select('*').eq('user_id', userId),
   ])
 
   return {
@@ -325,6 +434,8 @@ export async function exportUserData(userId) {
     goals: goals.data,
     ai_chat_history: chat.data,
     coach_query_cache: coachCache.data,
+    food_items: foods.data,
+    nutrition_log_entries: nutritionLogs.data,
   }
 }
 

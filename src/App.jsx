@@ -14,6 +14,7 @@ import { sessionHasValidSets } from './utils/session.js'
 import Home from './pages/Home.jsx'
 import Workouts from './pages/Workouts.jsx'
 import Analytics from './pages/Analytics.jsx'
+import Nutrition from './pages/Nutrition.jsx'
 import AITrainer from './pages/AITrainer.jsx'
 import Profile from './pages/Profile.jsx'
 
@@ -63,6 +64,8 @@ function AppContent() {
         return <Home onStartWorkout={handleStartWorkout} />
       case 'workouts':
         return <Workouts onStartWorkout={handleStartWorkout} />
+      case 'nutrition':
+        return <Nutrition />
       case 'analytics':
         return <Analytics />
       case 'ai-trainer':

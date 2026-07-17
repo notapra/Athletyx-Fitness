@@ -77,6 +77,17 @@ await check('POST /api/chat', async () => {
   if (!data.content) throw new Error('missing content')
 })
 
+await check('GET /api/nutrition/search requires query', async () => {
+  const { status } = await json('GET', '/api/nutrition/search?q=')
+  if (status !== 400) throw new Error(`expected 400, got ${status}`)
+})
+
+await check('GET /api/nutrition/search returns results shape', async () => {
+  const { status, data } = await json('GET', '/api/nutrition/search?q=apple')
+  if (status !== 200) throw new Error(`status ${status}`)
+  if (!Array.isArray(data.results)) throw new Error('missing results array')
+})
+
 const failed = results.filter((r) => !r.ok).length
 console.log(`\n${results.length - failed}/${results.length} passed`)
 process.exit(failed ? 1 : 0)

@@ -8,6 +8,7 @@ Shipped feature plans (completed work) live here in git. **Future / backlog plan
 | **02** | [Athletyx monorepo scaffold](./02-athletyx-monorepo-scaffold.plan.md) | Completed | `athletyx/tools/`, FastAPI backend, Next.js chat UI |
 | **03** | [Goal Guardian supervisor AI](./03-goal-guardian-supervisor-ai.plan.md) | Completed | Goal contract, drift detection, capped reminders, Supabase tables |
 | **04** | [Production launch and operations](./04-production-launch-and-operations.plan.md) | Planned | PR workflow, staging deploy, CI gates, mobile smoke checks, rollback readiness |
+| **05** | [Macro & micronutrient tracker](./05-macro-micronutrient-tracker.plan.md) | Completed | Gram-based logging, USDA API + saved catalog, macros/micros, Supabase sync |
 
 ## Future notes (local only)
 
@@ -29,4 +30,4 @@ These files are for personal roadmap / agent context on your machine, not the pu
 | `03-...plan.md` | `goal_guardian_ai_3865e245` |
 | `04-...plan.md` | `production_launch_and_ops_stage_04` |
 
-Plans (**01–04**) stay in **`docs/plans/`** on GitHub (completed or active stage plans). Future/backlog planning uses the gitignored folders above.
+Plans (**01–05**) stay in **`docs/plans/`** on GitHub (completed or active stage plans). Future/backlog planning uses the gitignored folders above.

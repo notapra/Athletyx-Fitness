@@ -19,6 +19,7 @@ from backend.agent import route_message
 from backend.auth_middleware import get_cors_origins, get_current_user
 from backend.logging_middleware import RequestLoggingMiddleware
 from backend.mcp_auth import build_mcp_session_payload
+from backend.nutrition_service import fetch_food_detail, search_foods
 from backend.query_cache import get_cache_stats
 
 load_dotenv()
@@ -72,8 +73,9 @@ def health():
     return {
         "status": "ok",
         "service": "athletyx",
-        "features": ["rag", "personalization", "ironlog_coach", "jwt_auth", "query_cache", "mcp_session"]
-        + (["serpapi"] if serpapi_available() else []),
+        "features": ["rag", "personalization", "ironlog_coach", "jwt_auth", "query_cache", "mcp_session", "nutrition"]
+        + (["serpapi"] if serpapi_available() else [])
+        + (["usda_fdc"] if os.getenv("USDA_FDC_API_KEY", "").strip() else []),
         "auth_required": os.getenv("REQUIRE_AUTH", "false"),
         "web_search_available": serpapi_available(),
         "openai_available": bool(os.getenv("OPENAI_API_KEY", "").strip()),
@@ -115,6 +117,28 @@ async def mcp_session(
     if not token:
         raise HTTPException(status_code=401, detail="Bearer token required for MCP session")
     return build_mcp_session_payload(user, token)
+
+
+@app.get("/api/nutrition/search")
+async def nutrition_search(q: str, limit: int = 12):
+    if not q.strip():
+        raise HTTPException(status_code=400, detail="Query required")
+    try:
+        results = await search_foods(q.strip(), page_size=limit)
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Food search failed: {exc}") from exc
+    return {"results": results, "api_configured": bool(os.getenv("USDA_FDC_API_KEY", "").strip())}
+
+
+@app.get("/api/nutrition/food/{fdc_id}")
+async def nutrition_food_detail(fdc_id: int):
+    try:
+        food = await fetch_food_detail(fdc_id)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Food lookup failed: {exc}") from exc
+    return food
 
 
 @app.post("/api/coach", response_model=CoachResponse)

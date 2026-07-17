@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { Home, Dumbbell, BarChart3, Sparkles, User } from 'lucide-react'
+import { Home, Dumbbell, BarChart3, Apple, Sparkles, User } from 'lucide-react'
 
 const TABS = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'workouts', label: 'Workouts', icon: Dumbbell },
+  { id: 'nutrition', label: 'Nutrition', icon: Apple },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'ai-trainer', label: 'AI Trainer', icon: Sparkles },
   { id: 'profile', label: 'Profile', icon: User },

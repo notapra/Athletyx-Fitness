@@ -12,7 +12,7 @@
     "cap:open:ios": "npx cap open ios",
     "cap:open:android": "npx cap open android",
     "lint": "eslint src",
-    "test": "python -m pytest athletyx/backend/tests -q",
+    "test": "python -m pytest athletyx/backend/tests -q && node scripts/test-nutrition.mjs",
     "test:api": "node scripts/smoke-test.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",

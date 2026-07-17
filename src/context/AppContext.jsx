@@ -21,9 +21,23 @@ import { isSupabaseConfigured } from '../services/authService.js'
 import {
   pushSessionToCloud,
   deleteSessionFromCloud,
+  pushFoodToCloud,
+  pushNutritionLogToCloud,
+  deleteNutritionLogFromCloud,
   scheduleSyncAll,
   pullFromCloud,
 } from '../services/syncService.js'
+import {
+  loadFoodCatalog,
+  saveFoodCatalog,
+  loadNutritionLogs,
+  saveNutritionLogs,
+} from '../utils/nutritionStorage.js'
+import {
+  createLogEntry,
+  createManualFood,
+  fetchFoodFromApi,
+} from '../services/nutritionService.js'
 import { enqueueSyncOp } from '../services/offlineQueue.js'
 import { useNetworkSync } from '../hooks/useNetworkSync.js'
 
@@ -42,6 +56,8 @@ export function AppProvider({ children }) {
   const [sessionSummary, setSessionSummary] = useState(null)
   const [guardianReminder, setGuardianReminder] = useState(null)
   const [sessionGuardianNote, setSessionGuardianNote] = useState(null)
+  const [foodCatalog, setFoodCatalog] = useState(() => loadFoodCatalog())
+  const [nutritionLogs, setNutritionLogs] = useState(() => loadNutritionLogs())
 
   useEffect(() => {
     const migrated = sessions.map(migrateLegacyWorkout)
@@ -59,6 +75,14 @@ export function AppProvider({ children }) {
   useEffect(() => {
     saveActiveSession(activeSession)
   }, [activeSession])
+
+  useEffect(() => {
+    saveFoodCatalog(foodCatalog)
+  }, [foodCatalog])
+
+  useEffect(() => {
+    saveNutritionLogs(nutritionLogs)
+  }, [nutritionLogs])
 
   const normalizedSessions = useMemo(() => normalizeSessions(sessions), [sessions])
 
@@ -164,6 +188,8 @@ export function AppProvider({ children }) {
     setBodyweight(loadBodyweight())
     setGoals(loadGoals())
     setActiveSession(loadActiveSession())
+    setFoodCatalog(loadFoodCatalog())
+    setNutritionLogs(loadNutritionLogs())
   }, [])
 
   useEffect(() => {
@@ -183,6 +209,72 @@ export function AppProvider({ children }) {
   const scheduleSyncAllHandler = useCallback(() => {
     if (cloudEnabled) scheduleSyncAll(effectiveUserId)
   }, [cloudEnabled, effectiveUserId])
+
+  const saveFoodToCatalog = useCallback(
+    (food) => {
+      setFoodCatalog((prev) => {
+        const exists = prev.some((f) => f.id === food.id)
+        if (exists) return prev.map((f) => (f.id === food.id ? food : f))
+        return [food, ...prev]
+      })
+      if (cloudEnabled) {
+        enqueueSyncOp({ type: 'food', userId: effectiveUserId, food }).then(() =>
+          pushFoodToCloud(effectiveUserId, food)
+        )
+      }
+      return food
+    },
+    [cloudEnabled, effectiveUserId]
+  )
+
+  const importFoodFromApi = useCallback(
+    async (fdcId) => {
+      const existing = foodCatalog.find((f) => f.fdc_id === fdcId)
+      if (existing) return existing
+      const fromApi = await fetchFoodFromApi(fdcId)
+      return saveFoodToCatalog(fromApi)
+    },
+    [foodCatalog, saveFoodToCatalog]
+  )
+
+  const addManualFood = useCallback(
+    (payload) => {
+      const food = createManualFood(payload)
+      return saveFoodToCatalog(food)
+    },
+    [saveFoodToCatalog]
+  )
+
+  const logNutritionEntry = useCallback(
+    ({ foodId, grams, meal, date }) => {
+      const entry = createLogEntry({ foodId, grams, meal, date })
+      setNutritionLogs((prev) => [entry, ...prev])
+      if (cloudEnabled) {
+        enqueueSyncOp({ type: 'nutrition_log', userId: effectiveUserId, entry }).then(() =>
+          pushNutritionLogToCloud(effectiveUserId, entry)
+        )
+      }
+      return entry
+    },
+    [cloudEnabled, effectiveUserId]
+  )
+
+  const deleteNutritionEntry = useCallback(
+    (id) => {
+      setNutritionLogs((prev) => prev.filter((e) => e.id !== id))
+      if (cloudEnabled) {
+        enqueueSyncOp({ type: 'delete_nutrition_log', userId: effectiveUserId, clientId: id }).then(
+          () => deleteNutritionLogFromCloud(effectiveUserId, id)
+        )
+      }
+    },
+    [cloudEnabled, effectiveUserId]
+  )
+
+  const foodsById = useMemo(
+    () => Object.fromEntries(foodCatalog.map((f) => [f.id, f])),
+    [foodCatalog]
+  )
 
   const value = {
     sessions: normalizedSessions,
@@ -220,6 +312,14 @@ export function AppProvider({ children }) {
     dismissGuardianReminder,
     sessionGuardianNote,
     setSessionGuardianNote,
+    foodCatalog,
+    foodsById,
+    nutritionLogs,
+    saveFoodToCatalog,
+    importFoodFromApi,
+    addManualFood,
+    logNutritionEntry,
+    deleteNutritionEntry,
   }
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
