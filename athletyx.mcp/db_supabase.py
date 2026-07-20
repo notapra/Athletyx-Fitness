@@ -487,3 +487,120 @@ def fetch_audit_log(user_id: UserId, limit: int = 50) -> list[AuditEntry]:
         )
         for row in rows
     ]
+
+
+def fetch_chat_history(user_id: UserId, limit: int = 50) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(limit, 200))
+    rows = select(
+        "ai_chat_history",
+        filters={"user_id": f"eq.{user_id}"},
+        order="created_at.desc",
+        limit=safe_limit,
+        select_cols="id,role,message,created_at",
+    )
+    out = []
+    for row in reversed(rows):
+        out.append(
+            {
+                "id": str(row["id"]),
+                "role": row["role"],
+                "message": row["message"],
+                "created_at": _iso(row.get("created_at")),
+            }
+        )
+    return out
+
+
+def append_chat_message(user_id: UserId, role: str, message: str) -> dict[str, Any]:
+    rows = insert(
+        "ai_chat_history",
+        {"user_id": str(user_id), "role": role, "message": message},
+    )
+    row = rows[0]
+    record_audit(user_id, "append_chat_message", "ai_chat_history", {"role": role})
+    return {
+        "id": str(row["id"]),
+        "role": row["role"],
+        "message": row["message"],
+        "created_at": _iso(row.get("created_at")),
+    }
+
+
+def record_guardian_check(
+    user_id: UserId,
+    check_type: str,
+    drift_score: int,
+    aligned: bool,
+    coach_excerpt: str | None = None,
+    payload: dict | None = None,
+) -> dict[str, Any]:
+    rows = insert(
+        "guardian_checks",
+        {
+            "user_id": str(user_id),
+            "check_type": check_type,
+            "drift_score": int(drift_score),
+            "aligned": bool(aligned),
+            "coach_excerpt": coach_excerpt,
+            "payload": payload or {},
+        },
+    )
+    row = rows[0]
+    return {
+        "id": str(row["id"]),
+        "check_type": row["check_type"],
+        "drift_score": row.get("drift_score"),
+        "aligned": row.get("aligned"),
+        "coach_excerpt": row.get("coach_excerpt"),
+        "created_at": _iso(row.get("created_at")),
+    }
+
+
+def fetch_guardian_history(user_id: UserId, limit: int = 25) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(limit, 100))
+    rows = select(
+        "guardian_checks",
+        filters={"user_id": f"eq.{user_id}"},
+        order="created_at.desc",
+        limit=safe_limit,
+    )
+    return [
+        {
+            "id": str(row["id"]),
+            "check_type": row.get("check_type"),
+            "drift_score": row.get("drift_score"),
+            "aligned": row.get("aligned"),
+            "coach_excerpt": row.get("coach_excerpt"),
+            "payload": row.get("payload") or {},
+            "created_at": _iso(row.get("created_at")),
+        }
+        for row in rows
+    ]
+
+
+def export_user_data(user_id: UserId) -> dict[str, Any]:
+    user = fetch_user_by_id(user_id)
+    sessions = fetch_workout_sessions(user_id, limit=50)
+    return {
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "profile": user.model_dump() if user else None,
+        "goals": [g.model_dump() for g in fetch_active_goals(user_id)],
+        "workout_sessions": [s.model_dump() for s in sessions],
+        "ai_chat_history": fetch_chat_history(user_id, limit=200),
+        "guardian_checks": fetch_guardian_history(user_id, limit=100),
+        "consents": fetch_consents(user_id).model_dump(),
+        "audit_log": [a.model_dump() for a in fetch_audit_log(user_id, limit=100)],
+    }
+
+
+def request_account_deletion(user_id: UserId) -> dict[str, Any]:
+    rows = insert("account_deletion_requests", {"user_id": str(user_id)})
+    row = rows[0]
+    record_audit(user_id, "request_account_deletion", "account_deletion_requests", {})
+    return {
+        "id": str(row["id"]),
+        "user_id": str(row["user_id"]),
+        "requested_at": _iso(row.get("requested_at")),
+        "scheduled_purge_at": _iso(row.get("scheduled_purge_at")),
+        "status": row.get("status", "pending"),
+    }

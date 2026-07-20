@@ -1,8 +1,20 @@
-"""Register MCP tool domains — supports per-domain servers (Phase 3)."""
+"""Register MCP tool domains — supports per-domain servers (Phase 2 + 3)."""
 
 from __future__ import annotations
 
-from tools import coaching, compliance, goals, identity, research, workouts
+from tools import (
+    account,
+    analytics,
+    chat,
+    coaching,
+    compliance,
+    goals,
+    guardian,
+    healthkit,
+    identity,
+    research,
+    workouts,
+)
 
 DOMAIN_MODULES = {
     "identity": [identity],
@@ -11,6 +23,11 @@ DOMAIN_MODULES = {
     "coaching": [coaching],
     "research": [research],
     "compliance": [compliance],
+    "analytics": [analytics],
+    "guardian": [guardian],
+    "chat": [chat],
+    "account": [account],
+    "healthkit": [healthkit],
 }
 
 ALL_TOOL_MODULES = [
@@ -20,6 +37,11 @@ ALL_TOOL_MODULES = [
     coaching,
     research,
     compliance,
+    analytics,
+    guardian,
+    chat,
+    account,
+    healthkit,
 ]
 
 

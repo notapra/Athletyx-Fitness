@@ -94,15 +94,19 @@ Clients pass the authenticated user via environment variable:
 
 ---
 
-## Phase 2 — Planned
+## Phase 2 — Implemented
 
-| Domain | Tools / resources |
-|--------|-------------------|
-| **Analytics** | `get_training_analytics`, `get_personal_records`, `get_muscle_heat_map`, dashboard resource |
-| **Guardian** | `run_guardian_check`, `get_guardian_history`, reminder tools |
-| **Chat** | `get_chat_history`, `append_chat_message` |
-| **Account** | `export_user_data`, `request_account_deletion` |
-| **HealthKit** | `sync_healthkit_workouts`, integration resources |
+| Domain | Tools / resources | Access |
+|--------|-------------------|--------|
+| **Analytics** | `get_training_analytics`, `get_personal_records`, `get_muscle_heat_map` | scoped |
+| | Resource `athletyx://analytics/dashboard` | public |
+| **Guardian** | `run_guardian_check`, `get_guardian_history`, `get_guardian_reminder_policy` | scoped |
+| **Chat** | `get_chat_history`, `append_chat_message` | scoped, audited |
+| **Account** | `export_user_data`, `request_account_deletion` | scoped, audited |
+| **HealthKit** | `sync_healthkit_workouts`, `get_healthkit_status` | scoped (stub until native plugins) |
+| | Resource `athletyx://integrations/healthkit` | public |
+
+Domain servers: set `ATHLETYX_MCP_DOMAIN` to `analytics`, `guardian`, `chat`, `account`, or `healthkit`.
 
 ---
 

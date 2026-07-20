@@ -99,6 +99,38 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log (user_id, created_at DESC);
 
+-- Phase 2 tables (chat, guardian, account deletion)
+CREATE TABLE IF NOT EXISTS ai_chat_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    message TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_chat_user ON ai_chat_history (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS guardian_checks (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    check_type VARCHAR(40) NOT NULL,
+    drift_score INTEGER DEFAULT 0,
+    aligned BOOLEAN DEFAULT true,
+    coach_excerpt TEXT,
+    payload JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_guardian_checks_user ON guardian_checks (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS account_deletion_requests (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    requested_at TIMESTAMPTZ DEFAULT now(),
+    scheduled_purge_at TIMESTAMPTZ DEFAULT (now() + interval '30 days'),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'cancelled', 'completed'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_fitness_goal ON users (fitness_goal);
 CREATE INDEX IF NOT EXISTS idx_users_experience_level ON users (experience_level);
 

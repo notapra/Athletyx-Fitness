@@ -533,16 +533,157 @@ def fetch_audit_log(user_id: int, limit: int = 50) -> list[AuditEntry]:
     return entries
 
 
+# ---------------------------------------------------------------------------
+# Phase 2 — Chat, Guardian, Account
+# ---------------------------------------------------------------------------
+
+def fetch_chat_history(user_id: int, limit: int = 50) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(limit, 200))
+    sql = """
+        SELECT id, role, message, created_at
+        FROM ai_chat_history
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, safe_limit))
+            rows = cur.fetchall()
+    out = []
+    for row in reversed(rows or []):
+        data = dict(row)
+        data["id"] = str(data["id"])
+        data["created_at"] = _iso(data.get("created_at"))
+        out.append(data)
+    return out
+
+
+def append_chat_message(user_id: int, role: str, message: str) -> dict[str, Any]:
+    sql = """
+        INSERT INTO ai_chat_history (user_id, role, message)
+        VALUES (%s, %s, %s)
+        RETURNING id, role, message, created_at
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, role, message))
+            row = cur.fetchone()
+        conn.commit()
+    data = dict(row)
+    data["id"] = str(data["id"])
+    data["created_at"] = _iso(data.get("created_at"))
+    record_audit(user_id, "append_chat_message", "ai_chat_history", {"role": role})
+    return data
+
+
+def record_guardian_check(
+    user_id: int,
+    check_type: str,
+    drift_score: int,
+    aligned: bool,
+    coach_excerpt: str | None = None,
+    payload: dict | None = None,
+) -> dict[str, Any]:
+    sql = """
+        INSERT INTO guardian_checks
+            (user_id, check_type, drift_score, aligned, coach_excerpt, payload)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id, check_type, drift_score, aligned, coach_excerpt, created_at
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                sql,
+                (
+                    user_id,
+                    check_type,
+                    int(drift_score),
+                    bool(aligned),
+                    coach_excerpt,
+                    Json(payload or {}),
+                ),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    data = dict(row)
+    data["id"] = str(data["id"])
+    data["created_at"] = _iso(data.get("created_at"))
+    return data
+
+
+def fetch_guardian_history(user_id: int, limit: int = 25) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(limit, 100))
+    sql = """
+        SELECT id, check_type, drift_score, aligned, coach_excerpt, payload, created_at
+        FROM guardian_checks
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, safe_limit))
+            rows = cur.fetchall()
+    out = []
+    for row in rows or []:
+        data = dict(row)
+        data["id"] = str(data["id"])
+        if isinstance(data.get("payload"), str):
+            data["payload"] = json.loads(data["payload"])
+        data["created_at"] = _iso(data.get("created_at"))
+        out.append(data)
+    return out
+
+
+def export_user_data(user_id: int) -> dict[str, Any]:
+    user = fetch_user_by_id(user_id)
+    return {
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "profile": user.model_dump() if user else None,
+        "goals": [g.model_dump() for g in fetch_active_goals(user_id)],
+        "workout_sessions": [s.model_dump() for s in fetch_workout_sessions(user_id, limit=50)],
+        "ai_chat_history": fetch_chat_history(user_id, limit=200),
+        "guardian_checks": fetch_guardian_history(user_id, limit=100),
+        "consents": fetch_consents(user_id).model_dump(),
+        "audit_log": [a.model_dump() for a in fetch_audit_log(user_id, limit=100)],
+    }
+
+
+def request_account_deletion(user_id: int) -> dict[str, Any]:
+    sql = """
+        INSERT INTO account_deletion_requests (user_id)
+        VALUES (%s)
+        RETURNING id, user_id, requested_at, scheduled_purge_at, status
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id,))
+            row = cur.fetchone()
+        conn.commit()
+    data = dict(row)
+    data["id"] = str(data["id"])
+    data["user_id"] = str(data["user_id"])
+    data["requested_at"] = _iso(data.get("requested_at"))
+    data["scheduled_purge_at"] = _iso(data.get("scheduled_purge_at"))
+    record_audit(user_id, "request_account_deletion", "account_deletion_requests", {})
+    return data
+
+
 # Phase 3: swap to Supabase PostgREST backend (UUID profiles + RLS via JWT).
 if os.getenv("ATHLETYX_DB_BACKEND", "local").lower() == "supabase":
     from db_supabase import (  # noqa: E402,F401
+        append_chat_message,
         build_goal_contract,
         complete_goal,
         create_goal,
         create_workout_session,
+        export_user_data,
         fetch_active_goals,
         fetch_audit_log,
+        fetch_chat_history,
         fetch_consents,
+        fetch_guardian_history,
         fetch_personalization_context,
         fetch_user_by_email,
         fetch_user_by_id,
@@ -551,6 +692,8 @@ if os.getenv("ATHLETYX_DB_BACKEND", "local").lower() == "supabase":
         fetch_workout_sessions,
         log_exercise_sets,
         record_audit,
+        record_guardian_check,
+        request_account_deletion,
         update_user_preferences,
         upsert_consents,
     )

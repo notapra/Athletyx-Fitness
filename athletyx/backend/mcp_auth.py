@@ -10,7 +10,19 @@ def build_mcp_session_payload(user: dict[str, Any], access_token: str) -> dict[s
     """Return env vars and domain server list for the authenticated user."""
     user_id = user.get("id")
     email = user.get("email")
-    domains = ["identity", "workouts", "goals", "coaching", "research", "compliance"]
+    domains = [
+        "identity",
+        "workouts",
+        "goals",
+        "coaching",
+        "research",
+        "compliance",
+        "analytics",
+        "guardian",
+        "chat",
+        "account",
+        "healthkit",
+    ]
 
     base_env = {
         "MCP_REQUIRE_AUTH": "true",

@@ -123,3 +123,36 @@ def register(mcp) -> None:
     @mcp.resource("athletyx://coaching/personalization-guide")
     def personalization_guide() -> str:
         return (_CONTENT / "personalization-guide.md").read_text(encoding="utf-8")
+
+    @mcp.resource("athletyx://analytics/dashboard")
+    def analytics_dashboard() -> str:
+        return json.dumps(
+            {
+                "tools": [
+                    "get_training_analytics",
+                    "get_personal_records",
+                    "get_muscle_heat_map",
+                ],
+                "methodology": "athletyx://analytics/methodology",
+                "notes": "Volume = sum(reps × weight). Heat map counts sets by muscle group.",
+            },
+            indent=2,
+        )
+
+    @mcp.resource("athletyx://integrations/healthkit")
+    def healthkit_integration() -> str:
+        return """# HealthKit / Health Connect integration
+
+Phase 2 exposes MCP tools `sync_healthkit_workouts` and `get_healthkit_status`.
+
+**Planned native wiring**
+- iOS: Apple HealthKit workout samples via Capacitor plugin
+- Android: Health Connect exercise sessions
+
+**Permissions**
+- Read/write workouts and active energy (user-gated)
+
+**Until plugins ship**
+- Tools return `available: false` without mutating data
+- Users can continue logging workouts in IronLog; export/import arrives in a later mobile release
+"""

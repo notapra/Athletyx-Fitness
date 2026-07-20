@@ -11,7 +11,7 @@ Development (local Postgres integer users):
   ATHLETYX_USER_ID=1
   ATHLETYX_DB_BACKEND=local
 
-Domain split (optional): ATHLETYX_MCP_DOMAIN=identity|workouts|goals|coaching|research|compliance|all|public
+Domain split (optional): ATHLETYX_MCP_DOMAIN=identity|workouts|goals|coaching|research|compliance|analytics|guardian|chat|account|healthkit|all|public
 """
 
 from __future__ import annotations
@@ -46,6 +46,11 @@ _SERVER_NAMES = {
     "coaching": "athletyx-coaching",
     "research": "athletyx-research",
     "compliance": "athletyx-compliance",
+    "analytics": "athletyx-analytics",
+    "guardian": "athletyx-guardian",
+    "chat": "athletyx-chat",
+    "account": "athletyx-account",
+    "healthkit": "athletyx-healthkit",
 }
 
 mcp = FastMCP(
