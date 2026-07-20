@@ -57,9 +57,14 @@ Rebuild after changing env: `npm run build:mobile`.
 
 - [ ] Sign in → workouts sync from second device
 - [ ] Log workout → appears in cloud
+- [ ] Nutrition → search/import or manual food → log grams → macros update
 - [ ] IronCoach → answer cached on repeat question
 - [ ] Settings → export data JSON
 - [ ] Settings → request account deletion
+- [ ] Settings → MCP access loads (when API + JWT available)
 - [ ] Offline → amber banner shows queued changes
 - [ ] Add set → light haptic (native only)
 - [ ] Rest timer end → medium haptic
+- [ ] Finish workout → haptic + summary
+
+Record results in [`mobile-smoke-record.md`](mobile-smoke-record.md).

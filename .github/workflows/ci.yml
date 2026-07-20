@@ -2,12 +2,17 @@ name: CI
 
 on:
   push:
-    branches: [main, master, 'feature/**']
+    branches:
+      - main
+      - master
+      - 'feature/**'
+      - 'dynamic-api-collection-and-macro'
   pull_request:
     branches: [main, master]
 
 jobs:
   frontend:
+    name: frontend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +28,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: placeholder-anon-key
 
   e2e:
+    name: e2e
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -35,13 +41,20 @@ jobs:
       - run: npm run test:e2e
 
   backend:
+    name: backend
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
       - run: pip install -r athletyx/requirements.txt pytest
-      - run: python -m pytest athletyx/backend/tests -q
+      - run: python -m pytest athletyx/backend/tests athletyx.mcp/tests -q
         env:
           PYTHONPATH: athletyx
+      - run: npm ci
+      - run: node scripts/test-nutrition.mjs
