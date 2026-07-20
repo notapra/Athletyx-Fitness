@@ -40,7 +40,9 @@ Dashboard → Authentication → URL configuration:
 
 | Item | Value |
 |------|-------|
-| Project ref | |
-| Applied date | |
-| RLS verify passed | Y/N |
-| Purge function deployed | Y/N |
+| Project ref | _(operator: create staging project + `supabase login` / link)_ |
+| Applied date | SQL pack verified locally 2026-07-19 (`npm run staging:print-sql`; all 6 files present) |
+| RLS verify passed | Pending cloud apply — run `staging-setup.sql` after migrations |
+| Purge function deployed | Pending — `supabase functions deploy purge-deleted-accounts --no-verify-jwt` after link |
+
+Cloud apply is blocked until `supabase login` (or `SUPABASE_ACCESS_TOKEN`) and a staging project exist. Use this runbook + printed SQL order when ready.

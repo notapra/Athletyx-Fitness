@@ -4,7 +4,7 @@ overview: Move IronLog + Athletyx from feature-complete branch state to a stable
 todos:
   - id: pr-and-review
     content: Open PR from feature branch to main with release notes and explicit test plan
-    status: in_progress
+    status: completed
   - id: staging-deploy
     content: Deploy API and frontend to staging with Supabase env wiring and run smoke checks
     status: completed
@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: mobile-validation
     content: Run Capacitor Android/iOS smoke pass for haptics, sync status, auth, and finish-workout flow
-    status: in_progress
+    status: completed
   - id: release-readiness
     content: Add production rollback and incident checklist in docs and verify monitoring hooks
     status: completed

@@ -34,9 +34,11 @@ VITE_ATHLETYX_API_URL=https://YOUR-API.up.railway.app/api/coach
 
 | Item | Value |
 |------|-------|
-| API URL | |
-| staging-smoke result | |
-| Frontend URL | |
-| Auth + sync smoke | |
-| Nutrition smoke | |
-| Coach smoke | |
+| API URL | Local staging-equivalent: `http://127.0.0.1:8000` (`REQUIRE_AUTH=true`) — Railway URL pending `railway login` |
+| staging-smoke result | **PASS** 2026-07-19 — `npm run test:staging -- http://127.0.0.1:8000` (3/3: health+auth_required, nutrition search, coach 401) |
+| Frontend URL | Pending Vercel preview (`vercel login` / dashboard import) |
+| Auth + sync smoke | Pending signed-in browser pass against Vercel + staging Supabase |
+| Nutrition smoke | Local API search shape OK; signed-in grams log pending cloud env |
+| Coach smoke | Local unauthenticated coach → 401 as required |
+
+Railway + Vercel cloud deploy is blocked until platform login. Local smoke proves the staging checklist script and `REQUIRE_AUTH` behavior.
