@@ -83,7 +83,7 @@ await check('GET /api/nutrition/search requires query', async () => {
 })
 
 await check('GET /api/nutrition/search returns results shape', async () => {
-  const { status, data } = await json('GET', '/api/nutrition/search?q=apple')
+  const { status, data } = await json('GET', '/api/nutrition/search?q=chicken')
   if (status !== 200) throw new Error(`status ${status}`)
   if (!Array.isArray(data.results)) throw new Error('missing results array')
 })

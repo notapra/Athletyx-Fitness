@@ -7,7 +7,7 @@ Shipped feature plans (completed work) live here in git. **Future / backlog plan
 | **01** | [IronLog: Dynamic Island + sub-muscle heat map](./01-ironlog-dynamic-island-sub-muscle-heat-map.plan.md) | Completed | `subMuscles.js`, `exerciseSubMuscleMap.js`, `DynamicIsland.jsx`, `AnatomicalBodyMap.jsx`, Home heat map |
 | **02** | [Athletyx monorepo scaffold](./02-athletyx-monorepo-scaffold.plan.md) | Completed | `athletyx/tools/`, FastAPI backend, Next.js chat UI |
 | **03** | [Goal Guardian supervisor AI](./03-goal-guardian-supervisor-ai.plan.md) | Completed | Goal contract, drift detection, capped reminders, Supabase tables |
-| **04** | [Production launch and operations](./04-production-launch-and-operations.plan.md) | In progress | PR workflow, staging deploy, CI gates, mobile smoke checks, rollback readiness |
+| **04** | [Production launch and operations](./04-production-launch-and-operations.plan.md) | Completed | PR workflow, staging deploy, CI gates, mobile smoke checks, rollback readiness |
 | **05** | [Macro & micronutrient tracker](./05-macro-micronutrient-tracker.plan.md) | Completed | Gram-based logging, USDA API + saved catalog, macros/micros, Supabase sync |
 | **06** | [MCP Phase 2 app-store tools](./06-mcp-phase2-app-store-tools.plan.md) | Completed | Analytics, Guardian, chat, account export/deletion, HealthKit stubs |
 

@@ -111,7 +111,7 @@ def food_from_usda_detail(food: dict[str, Any]) -> dict[str, Any]:
 async def search_foods(query: str, page_size: int = 12) -> list[dict[str, Any]]:
     from backend.common_foods import search_common_foods
 
-    local = search_common_foods(query, page_size=page_size)
+    local = search_common_foods(query, limit=page_size)
     if local:
         return local
 
