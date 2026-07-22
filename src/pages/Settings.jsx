@@ -13,6 +13,7 @@ import {
   ExternalLink,
   Plug,
   Copy,
+  Activity,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import { useApp } from '../hooks/useApp.js'
@@ -25,6 +26,11 @@ import {
 } from '../services/syncService.js'
 import { getCoachCacheStats } from '../services/coachCache.js'
 import { buildCursorMcpJson, fetchMcpSession } from '../services/mcpService.js'
+import {
+  getHealthSyncStatus,
+  getHealthSyncPreferences,
+  setHealthSyncEnabled,
+} from '../services/healthSync.js'
 import LegalDocument from '../components/compliance/LegalDocument.jsx'
 import Card from '../components/ui/Card.jsx'
 
@@ -60,6 +66,10 @@ export default function Settings({ onBack }) {
   const [legalView, setLegalView] = useState(null)
   const [mcpSession, setMcpSession] = useState(null)
   const [mcpLoading, setMcpLoading] = useState(false)
+  const healthStatus = getHealthSyncStatus()
+  const [healthSyncEnabled, setHealthSyncEnabledState] = useState(
+    () => getHealthSyncPreferences().enabled
+  )
   const cacheStats = getCoachCacheStats()
 
   useEffect(() => {
@@ -295,6 +305,42 @@ export default function Settings({ onBack }) {
         >
           <FileText className="h-3 w-3" /> Read full health disclaimer
         </button>
+      </Card>
+
+      <Card className="border-rose-500/20" data-testid="health-sync-card">
+        <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
+          <Activity className="h-4 w-4 text-rose-400" />
+          Health sync
+        </h2>
+        <p className="mb-3 text-xs text-zinc-500">
+          {healthStatus.provider
+            ? `${healthStatus.provider} — import/export workouts when native sync is enabled.`
+            : healthStatus.message}
+        </p>
+        <label className="flex items-center justify-between">
+          <span className="text-sm text-zinc-300">Enable when available</span>
+          <input
+            type="checkbox"
+            data-testid="health-sync-toggle"
+            checked={healthSyncEnabled}
+            disabled={!healthStatus.available}
+            onChange={(e) => {
+              const enabled = e.target.checked
+              setHealthSyncEnabledState(enabled)
+              setHealthSyncEnabled(enabled)
+              setStatusMsg(
+                enabled
+                  ? 'Health sync preference saved — native plugin pending'
+                  : 'Health sync disabled'
+              )
+            }}
+            className="h-5 w-5 rounded accent-rose-500 disabled:opacity-40"
+          />
+        </label>
+        <p className="mt-2 text-[10px] text-zinc-600">
+          Platform: {healthStatus.platform}
+          {healthStatus.available ? '' : ' · coming in Stage 08 native build'}
+        </p>
       </Card>
 
       <Card className="border-amber-500/20">

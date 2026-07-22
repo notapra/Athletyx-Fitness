@@ -76,7 +76,7 @@ test('iron coach refocus button is clickable', async ({ page }) => {
 test('nutrition tab loads daily tracking UI', async ({ page }) => {
   await page.getByTestId('nav-nutrition').click()
   await expect(page.getByRole('heading', { name: 'Nutrition' })).toBeVisible()
-  await expect(page.getByText(/per 100 g/i)).toBeVisible()
+  await expect(page.getByText('Built-in foods per 100 g (USDA-aligned)')).toBeVisible()
 })
 
 test('workouts filter chips toggle', async ({ page }) => {
