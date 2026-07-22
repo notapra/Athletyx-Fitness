@@ -30,6 +30,9 @@ import {
   getHealthSyncStatus,
   getHealthSyncPreferences,
   setHealthSyncEnabled,
+  refreshHealthSyncStatus,
+  requestHealthPermissions,
+  importWorkoutsFromHealth,
 } from '../services/healthSync.js'
 import LegalDocument from '../components/compliance/LegalDocument.jsx'
 import Card from '../components/ui/Card.jsx'
@@ -66,11 +69,16 @@ export default function Settings({ onBack }) {
   const [legalView, setLegalView] = useState(null)
   const [mcpSession, setMcpSession] = useState(null)
   const [mcpLoading, setMcpLoading] = useState(false)
-  const healthStatus = getHealthSyncStatus()
+  const [healthStatus, setHealthStatus] = useState(() => getHealthSyncStatus())
   const [healthSyncEnabled, setHealthSyncEnabledState] = useState(
     () => getHealthSyncPreferences().enabled
   )
+  const [healthBusy, setHealthBusy] = useState(false)
   const cacheStats = getCoachCacheStats()
+
+  useEffect(() => {
+    refreshHealthSyncStatus().then(setHealthStatus)
+  }, [])
 
   useEffect(() => {
     if (!cloudEnabled || !userId) return
@@ -318,7 +326,7 @@ export default function Settings({ onBack }) {
             : healthStatus.message}
         </p>
         <label className="flex items-center justify-between">
-          <span className="text-sm text-zinc-300">Enable when available</span>
+          <span className="text-sm text-zinc-300">Enable health sync</span>
           <input
             type="checkbox"
             data-testid="health-sync-toggle"
@@ -328,18 +336,57 @@ export default function Settings({ onBack }) {
               const enabled = e.target.checked
               setHealthSyncEnabledState(enabled)
               setHealthSyncEnabled(enabled)
-              setStatusMsg(
-                enabled
-                  ? 'Health sync preference saved — native plugin pending'
-                  : 'Health sync disabled'
-              )
+              setStatusMsg(enabled ? 'Health sync enabled' : 'Health sync disabled')
             }}
             className="h-5 w-5 rounded accent-rose-500 disabled:opacity-40"
           />
         </label>
+        {healthStatus.available ? (
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="health-sync-permissions"
+              disabled={healthBusy}
+              onClick={async () => {
+                setHealthBusy(true)
+                try {
+                  const result = await requestHealthPermissions()
+                  setStatusMsg(result.granted ? 'Health permissions granted' : result.reason)
+                } catch (e) {
+                  setStatusMsg(e.message)
+                } finally {
+                  setHealthBusy(false)
+                }
+              }}
+              className="rounded-xl border border-rose-500/30 px-3 py-1.5 text-xs text-rose-300 disabled:opacity-50"
+            >
+              Request permissions
+            </button>
+            <button
+              type="button"
+              data-testid="health-sync-import"
+              disabled={healthBusy || !healthSyncEnabled}
+              onClick={async () => {
+                setHealthBusy(true)
+                try {
+                  const result = await importWorkoutsFromHealth()
+                  reloadFromStorage()
+                  setStatusMsg(result.message)
+                } catch (e) {
+                  setStatusMsg(e.message)
+                } finally {
+                  setHealthBusy(false)
+                }
+              }}
+              className="rounded-xl border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 disabled:opacity-50"
+            >
+              Import now
+            </button>
+          </div>
+        ) : null}
         <p className="mt-2 text-[10px] text-zinc-600">
           Platform: {healthStatus.platform}
-          {healthStatus.available ? '' : ' · coming in Stage 08 native build'}
+          {healthStatus.available ? ' · native plugin active' : ` · ${healthStatus.message}`}
         </p>
       </Card>
 

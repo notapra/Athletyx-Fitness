@@ -41,11 +41,14 @@ import {
 } from '../services/nutritionService.js'
 import { enqueueSyncOp } from '../services/offlineQueue.js'
 import { useNetworkSync } from '../hooks/useNetworkSync.js'
+import { useHealthSync } from '../hooks/useHealthSync.js'
+import { exportWorkoutToHealth } from '../services/healthSync.js'
 
 export function AppProvider({ children }) {
   const { profile, userId } = useAuth()
   const effectiveUserId = userId ?? LOCAL_USER_ID
   const online = useNetworkSync(effectiveUserId)
+  useHealthSync()
   const cloudEnabled = isSupabaseConfigured && effectiveUserId !== LOCAL_USER_ID
 
   const [sessions, setSessions] = useState(() => loadSessions().map(migrateLegacyWorkout))
@@ -119,6 +122,8 @@ export function AppProvider({ children }) {
           pushSessionToCloud(effectiveUserId, finished)
         )
       }
+
+      exportWorkoutToHealth(finished).catch((e) => console.warn('Health export failed', e))
 
       return true
     },

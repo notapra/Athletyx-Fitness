@@ -56,6 +56,47 @@ def test_mcp_session_requires_auth_when_enabled(client, monkeypatch):
     assert res.status_code == 401
 
 
+def test_mcp_session_requires_bearer_even_when_auth_optional(client, monkeypatch):
+    monkeypatch.setenv("REQUIRE_AUTH", "false")
+    res = client.get("/api/mcp/session")
+    assert res.status_code == 401
+
+
+def test_mcp_session_accepts_bearer_when_auth_optional(client, monkeypatch):
+    async def fake_verify(token: str):
+        assert token == "test-jwt"
+        return {"id": "user-1", "email": "user@example.com"}
+
+    monkeypatch.setenv("REQUIRE_AUTH", "false")
+    monkeypatch.setattr("backend.auth_middleware.verify_supabase_jwt", fake_verify)
+    res = client.get("/api/mcp/session", headers={"Authorization": "Bearer test-jwt"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["user_id"] == "user-1"
+    assert body["email"] == "user@example.com"
+    assert "healthkit" in [d["domain"] for d in body["domains"]]
+
+
+def test_nutrition_search_builtin_chicken(client):
+    res = client.get("/api/nutrition/search", params={"q": "chicken"})
+    assert res.status_code == 200
+    body = res.json()
+    assert body["results"]
+    assert body["results"][0].get("source") == "builtin"
+
+
+def test_nutrition_search_usda_fallback(client, monkeypatch):
+    async def fake_search(q, page_size=12):
+        return [{"fdc_id": 99, "name": "Rare branded item", "brand": "Test", "source": "usda"}]
+
+    monkeypatch.setenv("USDA_FDC_API_KEY", "test-key")
+    monkeypatch.setattr("backend.main.search_foods", fake_search)
+    res = client.get("/api/nutrition/search", params={"q": "zzznomatch"})
+    assert res.status_code == 200
+    assert res.json()["api_configured"] is True
+    assert res.json()["results"][0]["source"] == "usda"
+
+
 def test_coach_cache_stats(client):
     res = client.get("/api/coach/cache-stats")
     assert res.status_code == 200

@@ -12,6 +12,7 @@ from fastapi import Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 _bearer = HTTPBearer(auto_error=False)
+_bearer_required = HTTPBearer()
 
 _jwks_cache: dict[str, Any] | None = None
 _rate_buckets: dict[str, list[float]] = defaultdict(list)
@@ -80,6 +81,20 @@ async def get_current_user(
         raise HTTPException(status_code=401, detail="Authorization required")
     user = await verify_supabase_jwt(creds.credentials)
     check_rate_limit(user.get("id", "unknown"))
+    request.state.user = user
+    return user
+
+
+async def get_mcp_session_user(
+    request: Request,
+    creds: HTTPAuthorizationCredentials = Depends(_bearer_required),
+) -> dict[str, Any]:
+    """Validate Bearer JWT for MCP session regardless of global REQUIRE_AUTH."""
+    if creds.scheme.lower() != "bearer" or not creds.credentials.strip():
+        raise HTTPException(status_code=401, detail="Bearer token required for MCP session")
+    user = await verify_supabase_jwt(creds.credentials)
+    if _require_auth():
+        check_rate_limit(user.get("id", "unknown"))
     request.state.user = user
     return user
 

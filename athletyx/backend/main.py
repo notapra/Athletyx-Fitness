@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 
 from backend.coaching_service import coach_with_athletyx, serpapi_available
 from backend.agent import route_message
-from backend.auth_middleware import get_cors_origins, get_current_user
+from backend.auth_middleware import get_cors_origins, get_current_user, get_mcp_session_user
 from backend.logging_middleware import RequestLoggingMiddleware
 from backend.mcp_auth import build_mcp_session_payload
 from backend.nutrition_service import fetch_food_detail, search_foods
@@ -94,29 +94,16 @@ async def chat(request: ChatRequest):
     return ChatResponse(**result)
 
 
-_bearer_optional = HTTPBearer(auto_error=False)
-
-
 @app.get("/api/mcp/session")
 async def mcp_session(
-    creds: HTTPAuthorizationCredentials | None = Depends(_bearer_optional),
-    user: dict | None = Depends(get_current_user),
+    creds: HTTPAuthorizationCredentials = Depends(HTTPBearer()),
+    user: dict = Depends(get_mcp_session_user),
 ):
     """
     Per-user MCP configuration (Phase 3).
-    Requires Bearer Supabase JWT when REQUIRE_AUTH=true.
+    Always requires a valid Bearer Supabase JWT (independent of REQUIRE_AUTH).
     """
-    if user is None:
-        if os.getenv("REQUIRE_AUTH", "false").lower() in ("1", "true", "yes"):
-            raise HTTPException(status_code=401, detail="Authorization required")
-        raise HTTPException(
-            status_code=400,
-            detail="MCP session requires authentication. Set REQUIRE_AUTH=true in production.",
-        )
-    token = creds.credentials if creds else ""
-    if not token:
-        raise HTTPException(status_code=401, detail="Bearer token required for MCP session")
-    return build_mcp_session_payload(user, token)
+    return build_mcp_session_payload(user, creds.credentials)
 
 
 @app.get("/api/nutrition/search")

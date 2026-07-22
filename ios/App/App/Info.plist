@@ -47,5 +47,9 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSHealthShareUsageDescription</key>
+	<string>IronLog reads your workout data from Apple Health to import strength sessions.</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>IronLog writes exercise time for workouts you finish in the app.</string>
 </dict>
 </plist>

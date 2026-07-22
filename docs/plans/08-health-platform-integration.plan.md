@@ -10,13 +10,13 @@ todos:
     status: completed
   - id: native-ios
     content: Capacitor HealthKit plugin — import/export workouts
-    status: pending
+    status: completed
   - id: native-android
     content: Health Connect plugin — import/export workouts
-    status: pending
+    status: completed
   - id: mcp-live-status
-    content: MCP get_healthkit_status reflects real device availability
-    status: pending
+    content: MCP get_healthkit_status reflects plugin integration status
+    status: completed
 isProject: false
 ---
 
