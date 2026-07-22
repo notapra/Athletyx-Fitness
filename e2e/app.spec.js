@@ -15,6 +15,7 @@ test('bottom navigation visits every tab', async ({ page }) => {
   const tabs = [
     { id: 'home', heading: /Ready to train|Great session today/ },
     { id: 'workouts', heading: 'Workouts' },
+    { id: 'nutrition', heading: 'Nutrition' },
     { id: 'analytics', heading: 'Analytics' },
     { id: 'ai-trainer', heading: 'IronCoach' },
     { id: 'profile', heading: /Athlete|Profile|Saved on this device/ },
@@ -70,6 +71,12 @@ test('iron coach refocus button is clickable', async ({ page }) => {
   await expect(page.getByTestId('refocus-goals')).toBeVisible()
   await page.getByTestId('refocus-goals').click()
   await expect(page.getByText(/Refocusing on your goal/i)).toBeVisible({ timeout: 10_000 })
+})
+
+test('nutrition tab loads daily tracking UI', async ({ page }) => {
+  await page.getByTestId('nav-nutrition').click()
+  await expect(page.getByRole('heading', { name: 'Nutrition' })).toBeVisible()
+  await expect(page.getByText(/per 100 g/i)).toBeVisible()
 })
 
 test('workouts filter chips toggle', async ({ page }) => {

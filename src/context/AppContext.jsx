@@ -37,6 +37,7 @@ import {
   createLogEntry,
   createManualFood,
   fetchFoodFromApi,
+  foodFromBuiltinCatalog,
 } from '../services/nutritionService.js'
 import { enqueueSyncOp } from '../services/offlineQueue.js'
 import { useNetworkSync } from '../hooks/useNetworkSync.js'
@@ -227,6 +228,16 @@ export function AppProvider({ children }) {
     [cloudEnabled, effectiveUserId]
   )
 
+  const importFoodFromCatalog = useCallback(
+    (catalogId) => {
+      const existing = foodCatalog.find((f) => f.catalog_id === catalogId)
+      if (existing) return existing
+      const food = foodFromBuiltinCatalog(catalogId)
+      return saveFoodToCatalog(food)
+    },
+    [foodCatalog, saveFoodToCatalog]
+  )
+
   const importFoodFromApi = useCallback(
     async (fdcId) => {
       const existing = foodCatalog.find((f) => f.fdc_id === fdcId)
@@ -316,6 +327,7 @@ export function AppProvider({ children }) {
     foodsById,
     nutritionLogs,
     saveFoodToCatalog,
+    importFoodFromCatalog,
     importFoodFromApi,
     addManualFood,
     logNutritionEntry,

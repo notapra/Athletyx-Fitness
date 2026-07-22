@@ -2,7 +2,8 @@ import { useMemo, useState } from 'react'
 import { Apple, Plus, Search, Trash2 } from 'lucide-react'
 import { useApp } from '../hooks/useApp.js'
 import Card from '../components/ui/Card.jsx'
-import { searchFoodsApi } from '../services/nutritionService.js'
+import { searchFoodsLocal } from '../services/nutritionService.js'
+import { listCommonFoodsByCategory } from '../utils/commonFoodSearch.js'
 import {
   dailyTotals,
   formatNutrient,
@@ -14,13 +15,18 @@ import {
 } from '../utils/nutrients.js'
 
 const MEALS = ['breakfast', 'lunch', 'dinner', 'snack']
+const CATEGORIES = [
+  { id: 'protein', label: 'Protein' },
+  { id: 'carb', label: 'Carbs' },
+  { id: 'fat', label: 'Fats' },
+]
 
 export default function Nutrition() {
   const {
     foodCatalog,
     foodsById,
     nutritionLogs,
-    importFoodFromApi,
+    importFoodFromCatalog,
     addManualFood,
     logNutritionEntry,
     deleteNutritionEntry,
@@ -29,8 +35,7 @@ export default function Nutrition() {
   const [dateKey, setDateKey] = useState(() => toDateKey())
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState([])
-  const [searching, setSearching] = useState(false)
-  const [searchError, setSearchError] = useState('')
+  const [activeCategory, setActiveCategory] = useState('protein')
   const [selectedFoodId, setSelectedFoodId] = useState('')
   const [grams, setGrams] = useState('100')
   const [meal, setMeal] = useState('lunch')
@@ -42,6 +47,8 @@ export default function Nutrition() {
   const [manualFat, setManualFat] = useState('')
   const [manualCalories, setManualCalories] = useState('')
 
+  const categoryFoods = useMemo(() => listCommonFoodsByCategory(activeCategory), [activeCategory])
+
   const dayLogs = useMemo(
     () => nutritionLogs.filter((e) => e.date === dateKey),
     [nutritionLogs, dateKey]
@@ -51,31 +58,18 @@ export default function Nutrition() {
     [nutritionLogs, foodsById, dateKey]
   )
 
-  async function handleSearch(e) {
+  function handleSearch(e) {
     e.preventDefault()
     if (!query.trim()) return
-    setSearching(true)
-    setSearchError('')
-    try {
-      const data = await searchFoodsApi(query.trim())
-      setSearchResults(data.results ?? [])
-      if (!data.api_configured) {
-        setSearchError('USDA API not configured — use manual entry or saved foods.')
-      }
-    } catch (err) {
-      setSearchError(err.message)
-      setSearchResults([])
-    } finally {
-      setSearching(false)
-    }
+    const data = searchFoodsLocal(query.trim())
+    setSearchResults(data.results ?? [])
   }
 
-  async function handleImport(fdcId) {
-    setStatus('Importing food…')
+  function handleAddBuiltin(catalogId) {
     try {
-      const food = await importFoodFromApi(fdcId)
+      const food = importFoodFromCatalog(catalogId)
       setSelectedFoodId(food.id)
-      setStatus(`Saved ${food.name} (per 100 g)`)
+      setStatus(`Added ${food.name} (per 100 g, built-in)`)
     } catch (err) {
       setStatus(err.message)
     }
@@ -100,7 +94,7 @@ export default function Nutrition() {
   function handleLog(e) {
     e.preventDefault()
     if (!selectedFoodId) {
-      setStatus('Select or import a food first')
+      setStatus('Select or add a food first')
       return
     }
     try {
@@ -125,7 +119,7 @@ export default function Nutrition() {
           Nutrition
         </h1>
         <p className="mt-1 text-xs text-zinc-500">
-          All values per 100 g in catalog · logs scale by grams you enter
+          Built-in foods per 100 g (USDA-aligned) · logs scale by grams — no API key needed
         </p>
       </header>
 
@@ -170,40 +164,82 @@ export default function Nutrition() {
 
       <Card>
         <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
-          <Search className="h-4 w-4" /> Find food (USDA — saved locally after import)
+          <Search className="h-4 w-4" /> Common foods (built-in)
         </h2>
         <form onSubmit={handleSearch} className="flex gap-2">
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="e.g. chicken breast, oats, greek yogurt"
+            placeholder="e.g. chicken breast, rice, peanut butter"
             className="flex-1 rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white"
           />
           <button
             type="submit"
-            disabled={searching}
             className="rounded-xl bg-emerald-500/20 px-4 text-sm font-semibold text-emerald-300"
           >
-            {searching ? '…' : 'Search'}
+            Search
           </button>
         </form>
-        {searchError ? <p className="mt-2 text-xs text-amber-400">{searchError}</p> : null}
-        <ul className="mt-3 max-h-40 space-y-2 overflow-y-auto">
-          {searchResults.map((item) => (
-            <li
-              key={item.fdc_id}
-              className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 px-3 py-2 text-xs"
+        {searchResults.length > 0 ? (
+          <ul className="mt-3 max-h-40 space-y-2 overflow-y-auto">
+            {searchResults.map((item) => (
+              <li
+                key={item.catalog_id}
+                className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800 px-3 py-2 text-xs"
+              >
+                <div>
+                  <p className="font-medium text-zinc-200">{item.name}</p>
+                  <p className="text-zinc-500 capitalize">{item.category}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => handleAddBuiltin(item.catalog_id)}
+                  className="shrink-0 rounded-lg bg-cyan-500/15 px-2 py-1 text-cyan-300"
+                >
+                  Add
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <div className="mt-4 flex gap-2">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat.id}
+              type="button"
+              onClick={() => setActiveCategory(cat.id)}
+              className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                activeCategory === cat.id
+                  ? 'bg-emerald-500/25 text-emerald-300'
+                  : 'bg-zinc-800 text-zinc-400'
+              }`}
             >
-              <div>
-                <p className="font-medium text-zinc-200">{item.name}</p>
-                {item.brand ? <p className="text-zinc-500">{item.brand}</p> : null}
+              {cat.label}
+            </button>
+          ))}
+        </div>
+        <ul className="mt-3 max-h-48 space-y-2 overflow-y-auto">
+          {categoryFoods.map((food) => (
+            <li
+              key={food.id}
+              className="flex items-center justify-between gap-2 rounded-xl border border-zinc-800/80 px-3 py-2 text-xs"
+            >
+              <div className="min-w-0">
+                <p className="truncate font-medium text-zinc-200">{food.name}</p>
+                <p className="text-zinc-500">
+                  {formatNutrient('calories_kcal', food.nutrients_per_100g.calories_kcal)} kcal · P{' '}
+                  {formatNutrient('protein_g', food.nutrients_per_100g.protein_g)}g · C{' '}
+                  {formatNutrient('carbs_g', food.nutrients_per_100g.carbs_g)}g · F{' '}
+                  {formatNutrient('fat_g', food.nutrients_per_100g.fat_g)}g
+                  <span className="text-zinc-600"> / 100g</span>
+                </p>
               </div>
               <button
                 type="button"
-                onClick={() => handleImport(item.fdc_id)}
-                className="shrink-0 rounded-lg bg-cyan-500/15 px-2 py-1 text-cyan-300"
+                onClick={() => handleAddBuiltin(food.id)}
+                className="shrink-0 rounded-lg bg-emerald-500/15 px-2 py-1 text-emerald-300"
               >
-                Import
+                Add
               </button>
             </li>
           ))}
@@ -213,7 +249,7 @@ export default function Nutrition() {
           onClick={() => setShowManual((v) => !v)}
           className="mt-3 text-xs text-cyan-400"
         >
-          {showManual ? 'Hide manual entry' : 'Enter food manually (per 100 g)'}
+          {showManual ? 'Hide manual entry' : 'Custom food (per 100 g)'}
         </button>
         {showManual ? (
           <form onSubmit={handleManualSave} className="mt-3 grid grid-cols-2 gap-2 text-xs">
@@ -264,7 +300,7 @@ export default function Nutrition() {
               type="submit"
               className="col-span-2 rounded-xl bg-emerald-500/20 py-2 font-semibold text-emerald-300"
             >
-              Save manual food
+              Save custom food
             </button>
           </form>
         ) : null}

@@ -3,7 +3,7 @@
  */
 
 import { getAccessToken } from './supabaseClient.js'
-import { getAthletyxBaseUrl } from './athletyxService.js'
+import { getAthletyxApiPath } from './athletyxService.js'
 
 export async function fetchMcpSession() {
   const token = await getAccessToken()
@@ -11,8 +11,7 @@ export async function fetchMcpSession() {
     throw new Error('Sign in to load your MCP configuration.')
   }
 
-  const base = getAthletyxBaseUrl().replace(/\/$/, '')
-  const res = await fetch(`${base}/mcp/session`, {
+  const res = await fetch(getAthletyxApiPath('mcp/session'), {
     headers: { Authorization: `Bearer ${token}` },
   })
 

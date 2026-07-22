@@ -3,20 +3,35 @@
  */
 
 import { getAccessToken } from './supabaseClient.js'
+import { resolveAthletyxUrls, resolveAthletyxApiPath } from '../utils/athletyxApiUrls.js'
 
-const DEFAULT_BASE = '/api/athletyx'
-
-export function getAthletyxBaseUrl() {
-  return import.meta.env.VITE_ATHLETYX_API_URL || DEFAULT_BASE
+function urls() {
+  return resolveAthletyxUrls(import.meta.env.VITE_ATHLETYX_API_URL)
 }
 
-function healthBaseUrl() {
-  return getAthletyxBaseUrl().replace(/\/coach$/, '')
+/** Full POST target for IronCoach (`…/api/coach`). */
+export function getAthletyxCoachUrl() {
+  return urls().coachUrl
+}
+
+/** API root for `/health` only. */
+export function getAthletyxApiRoot() {
+  return urls().apiRoot
+}
+
+/** Non-coach route path (nutrition, MCP, …). */
+export function getAthletyxApiPath(suffix) {
+  return resolveAthletyxApiPath(suffix, import.meta.env.VITE_ATHLETYX_API_URL)
+}
+
+/** @deprecated Prefer getAthletyxCoachUrl() or getAthletyxApiRoot(). */
+export function getAthletyxBaseUrl() {
+  return getAthletyxCoachUrl()
 }
 
 export async function getAthletyxHealth() {
   try {
-    const res = await fetch(`${healthBaseUrl()}/health`)
+    const res = await fetch(`${getAthletyxApiRoot()}/health`)
     if (!res.ok) return { ok: false }
     const data = await res.json()
     return {
@@ -39,8 +54,7 @@ export async function checkAthletyxHealth() {
  * Full Athletyx coach: personalization + document RAG + optional web research when SerpAPI is active.
  */
 export async function sendAthletyxCoachMessage(message, { profile, goals = [], analysis, useWebSearch }) {
-  const base = getAthletyxBaseUrl()
-  const url = base.endsWith('/coach') ? base : `${base.replace(/\/$/, '')}/coach`
+  const url = getAthletyxCoachUrl()
 
   const token = await getAccessToken()
   const headers = { 'Content-Type': 'application/json' }
@@ -61,7 +75,6 @@ export async function sendAthletyxCoachMessage(message, { profile, goals = [], a
     analysis,
   }
 
-  // Explicit false skips SerpAPI/DDG on the server; omit when web search is available and desired
   if (useWebSearch === false) {
     body.use_web_search = false
   } else if (useWebSearch === true) {

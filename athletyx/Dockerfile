@@ -9,6 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY athletyx/backend ./backend
 COPY athletyx.mcp ./athletyx.mcp
+COPY data/common-foods.json ./data/common-foods.json
 
 ENV PYTHONPATH=/app
 EXPOSE 8000

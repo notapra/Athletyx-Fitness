@@ -58,3 +58,10 @@ jobs:
           PYTHONPATH: athletyx
       - run: npm ci
       - run: node scripts/test-nutrition.mjs
+      - run: node scripts/test-api-urls.mjs
+      - run: node scripts/test-common-foods.mjs
+      - name: Live API smoke (uvicorn + smoke-test.mjs)
+        run: |
+          PYTHONPATH=athletyx python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+          sleep 4
+          node scripts/smoke-test.mjs http://127.0.0.1:8000

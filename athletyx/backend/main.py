@@ -127,7 +127,21 @@ async def nutrition_search(q: str, limit: int = 12):
         results = await search_foods(q.strip(), page_size=limit)
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Food search failed: {exc}") from exc
-    return {"results": results, "api_configured": bool(os.getenv("USDA_FDC_API_KEY", "").strip())}
+    return {
+        "results": results,
+        "api_configured": bool(os.getenv("USDA_FDC_API_KEY", "").strip()),
+        "builtin_count": len(results) if results and results[0].get("source") == "builtin" else 0,
+    }
+
+
+@app.get("/api/nutrition/builtin/{catalog_id}")
+async def nutrition_builtin_food(catalog_id: str):
+    from backend.common_foods import get_common_food
+
+    food = get_common_food(catalog_id)
+    if not food:
+        raise HTTPException(status_code=404, detail="Food not found in built-in catalog")
+    return food
 
 
 @app.get("/api/nutrition/food/{fdc_id}")
