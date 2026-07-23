@@ -11,7 +11,6 @@ import httpx
 
 from auth import get_authenticated_user_id
 from db import fetch_consents, fetch_personalization_context
-from tools.helpers import fail, ok, safe_execute
 
 _SERPAPI_URL = "https://serpapi.com/search.json"
 _CONTENT = Path(__file__).resolve().parent.parent / "content"
@@ -38,11 +37,44 @@ def _load_doc_index() -> list[tuple[str, str]]:
     if guide_path.exists():
         _DOC_INDEX.append(("athletyx://coaching/personalization-guide", guide_path.read_text(encoding="utf-8")))
 
+    research_dir = _CONTENT / "research"
+    if research_dir.is_dir():
+        for path in sorted(research_dir.glob("*.md")):
+            uri = f"athletyx://research/{path.stem}"
+            _DOC_INDEX.append((uri, path.read_text(encoding="utf-8")))
+
     return _DOC_INDEX
 
 
 def _tokenize(text: str) -> set[str]:
     return {t for t in re.findall(r"[a-z0-9]+", text.lower()) if len(t) > 2}
+
+
+def _best_snippet(query: str, body: str, size: int = 520) -> str:
+    """Prefer the paragraph that best matches the query (not just the file header)."""
+    tokens = _tokenize(query)
+    blocks = [b.strip() for b in re.split(r"\n\s*\n", body) if b.strip()]
+    if not blocks:
+        return body[:size].replace("\n", " ").strip()
+
+    def block_score(block: str) -> float:
+        lower = block.lower()
+        score = sum(2.0 for t in tokens if t in lower)
+        if lower.startswith("## key findings") or "key findings" in lower[:80]:
+            score += 3.0
+        if lower.startswith("## coach application"):
+            score += 2.5
+        return score
+
+    ranked = sorted(blocks, key=block_score, reverse=True)
+    snippet = ranked[0]
+    # Prefer findings + coach application when both score
+    if len(ranked) > 1 and block_score(ranked[1]) >= block_score(ranked[0]) * 0.7:
+        combo = f"{ranked[0]}\n\n{ranked[1]}"
+        if len(combo) <= size + 80:
+            snippet = combo
+    clean = snippet.replace("\n", " ").strip()
+    return clean[:size] + ("…" if len(clean) > size else "")
 
 
 def _score_document(query: str, uri: str, body: str, search_context: str) -> tuple[float, list[str]]:
@@ -68,6 +100,10 @@ def _score_document(query: str, uri: str, body: str, search_context: str) -> tup
             score += 1.0
             reasons.append(f"Relevant to profile context: '{marker}'")
 
+    if "/research/" in uri:
+        score += 1.5
+        reasons.append("Peer-reviewed research brief")
+
     if uri.endswith("health-disclaimer") or uri.endswith("safety-rails"):
         score += 0.5
         reasons.append("Safety/policy document")
@@ -81,12 +117,12 @@ def rank_documents(query: str, search_context: str, limit: int = 5) -> list[dict
         score, reasons = _score_document(query, uri, body, search_context)
         if score <= 0:
             continue
-        snippet = body[:400].replace("\n", " ").strip()
+        snippet = _best_snippet(query, body)
         results.append(
             {
                 "uri": uri,
                 "score": round(score, 2),
-                "snippet": snippet + ("…" if len(body) > 400 else ""),
+                "snippet": snippet,
                 "relevance_notes": reasons,
             }
         )
@@ -163,6 +199,8 @@ def search_duckduckgo_via_serpapi(query: str, num: int = 8) -> dict:
 
 
 def register(mcp) -> None:
+    from tools.helpers import fail, ok, safe_execute
+
     @mcp.tool()
     def get_personalization_context() -> dict:
         """Return age, injuries, effort limits, and coaching directives for the authenticated user."""

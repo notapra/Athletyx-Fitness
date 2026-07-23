@@ -2,19 +2,46 @@
 
 from __future__ import annotations
 
+from pydantic import ValidationError
+
 from models import Goal, GoalContract, PersonalFactors, User
+
+_EFFORT_ALIASES = {
+    "high": "aggressive",
+    "hard": "aggressive",
+    "max": "aggressive",
+    "low": "conservative",
+    "easy": "conservative",
+    "medium": "moderate",
+    "normal": "moderate",
+}
 
 
 def default_personal_factors() -> dict:
     return PersonalFactors().model_dump()
 
 
+def _coerce_personal_factors(raw: dict | None) -> PersonalFactors:
+    data = dict(raw or {})
+    effort = str(data.get("max_effort_level") or "").strip().lower()
+    if effort in _EFFORT_ALIASES:
+        data["max_effort_level"] = _EFFORT_ALIASES[effort]
+    try:
+        return PersonalFactors.model_validate(data)
+    except ValidationError:
+        data.pop("max_effort_level", None)
+        try:
+            return PersonalFactors.model_validate(data)
+        except ValidationError:
+            return PersonalFactors()
+
+
 def merge_personal_factors(existing: dict | None, updates: dict) -> dict:
-    base = PersonalFactors.model_validate(existing or {}).model_dump()
+    base = _coerce_personal_factors(existing).model_dump()
     for key, value in updates.items():
         if value is not None:
             base[key] = value
-    return PersonalFactors.model_validate(base).model_dump()
+    return _coerce_personal_factors(base).model_dump()
 
 
 def build_personalization_context_from_profile(
@@ -23,7 +50,7 @@ def build_personalization_context_from_profile(
 ) -> dict:
     """IronLog local profile → same context bundle as MCP (no Postgres required)."""
     ai_prefs = profile.get("ai_preferences") or {}
-    factors = PersonalFactors.model_validate(ai_prefs.get("personal_factors") or {})
+    factors = _coerce_personal_factors(ai_prefs.get("personal_factors") or {})
     constraints = ai_prefs.get("constraints") or []
 
     user = User(

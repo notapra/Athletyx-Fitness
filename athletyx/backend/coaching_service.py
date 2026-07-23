@@ -227,21 +227,97 @@ USER QUESTION: {message}
 """
 
 
-def _fallback_reply(message: str, personalization: dict, rag_block: str, web_block: str) -> str:
-    """Offline coach when OPENAI_API_KEY is not set."""
+def _fallback_reply(
+    message: str,
+    personalization: dict,
+    doc_hits: list[dict],
+    web_block: str = "",
+) -> str:
+    """Evidence-based coach when OPENAI_API_KEY is not set — answers from RAG hits."""
     directives = personalization.get("coaching_directives") or []
-    top_directive = directives[0] if directives else "Train consistently and recover well."
-    rag_hint = ""
-    if rag_block:
-        rag_hint = " I checked Athletyx safety guides and your exercise catalog for this."
-    web_hint = ""
-    if web_block:
-        web_hint = " I also pulled recent web research tailored to your profile."
-    return (
-        f"{top_directive}{rag_hint}{web_hint} "
-        f"Regarding your question: focus on form, progressive overload within your effort limits, "
-        f"and ask again with OPENAI_API_KEY in PRIVATE.env for full LLM coaching."
-    )
+    factors = personalization.get("personal_factors") or {}
+    injuries = factors.get("injury_history") or []
+    restrictions = factors.get("movement_restrictions") or []
+
+    lower = (message or "").lower()
+    topic_uri_hints = []
+    if any(w in lower for w in ("protein", "nutrition", "diet", "calorie", "eat")):
+        topic_uri_hints = ["protein-issn"]
+    elif any(w in lower for w in ("deload", "taper", "overreach")):
+        topic_uri_hints = ["deloading"]
+    elif any(w in lower for w in ("sleep", "recover", "recovery", "fatigue", "tired")):
+        topic_uri_hints = ["sleep-recovery"]
+    elif any(w in lower for w in ("shoulder", "injury", "pain", "overhead", "ohp")):
+        topic_uri_hints = ["injury-shoulder-safety"]
+    elif any(w in lower for w in ("bench", "squat", "strength", "hypertrophy", "train today", "workout")):
+        topic_uri_hints = ["resistance-training-acsm"]
+
+    research_hits = [h for h in (doc_hits or []) if "/research/" in (h.get("uri") or "")]
+    top = None
+    for hint in topic_uri_hints:
+        top = next((h for h in research_hits if hint in (h.get("uri") or "")), None)
+        if top:
+            break
+    if top is None:
+        top = research_hits[0] if research_hits else ((doc_hits or [None])[0])
+
+    snippet = (top or {}).get("snippet") or ""
+    uri = (top or {}).get("uri") or ""
+
+    # Pull a compact factual line from the best-matching research brief
+    fact = ""
+    if snippet:
+        for sentence in re.split(r"(?<=[.!?])\s+", snippet):
+            if any(ch.isdigit() for ch in sentence) or "not" in sentence.lower() or "do not" in sentence.lower():
+                fact = sentence.strip()
+                if len(fact) > 40:
+                    break
+        if not fact:
+            fact = snippet[:280].strip()
+
+    injury_note = ""
+    if injuries or restrictions:
+        bits = []
+        if injuries:
+            bits.append(f"injuries on file: {', '.join(map(str, injuries))}")
+        if restrictions:
+            bits.append(f"restrictions: {', '.join(map(str, restrictions))}")
+        injury_note = " Respecting your profile (" + "; ".join(bits) + ")."
+
+    if any(w in lower for w in ("protein", "nutrition", "diet", "calorie", "eat")):
+        lead = (
+            "For muscle gain, evidence-based targets are about **1.4–2.0 g protein/kg/day** "
+            "(~**0.64–0.91 g/lb**), with meals of ~20–40 g protein across the day."
+        )
+    elif any(w in lower for w in ("deload", "taper", "overreach")):
+        lead = (
+            "A deload is usually ~**5–7 days** of reduced volume (often every **4–8 weeks**, "
+            "or sooner if performance stalls / joints feel beat up) — keep showing up, cut sets/reps."
+        )
+    elif any(w in lower for w in ("sleep", "recover", "recovery", "fatigue", "tired")):
+        lead = (
+            "Sleep loss reliably hurts training quality and raises perceived effort; "
+            "aim for about **7–9 hours**. ~6 hours is usually not enough for hard sessions."
+        )
+    elif any(w in lower for w in ("shoulder", "injury", "pain", "overhead", "ohp")):
+        lead = (
+            "Do **not** load heavy overhead pressing through shoulder pain — "
+            "get clearance and use pain-free alternatives until symptoms settle."
+        )
+    elif any(w in lower for w in ("bench", "squat", "strength", "hypertrophy", "train today", "workout")):
+        lead = (
+            "Progress comes from consistent exposure (≥~2×/week per muscle), progressive overload, "
+            "and enough weekly volume — absolute failure every set is not required."
+        )
+    else:
+        lead = directives[0] if directives else "Train consistently, progress gradually, and recover well."
+
+    cite = f" Sources: {uri}." if uri else ""
+    detail = f" From Athletyx research notes: {fact}" if fact else ""
+    web_hint = " Web research also available when SerpAPI is enabled." if web_block else ""
+    disclaimer = " Not medical advice."
+
+    return f"{lead}{injury_note}{detail}{cite}{web_hint}{disclaimer}"
 
 
 async def _call_openai(system_prompt: str, user_message: str) -> str:
@@ -315,10 +391,10 @@ async def coach_with_athletyx(
             try:
                 content = await _call_openai(system_prompt, text)
             except Exception as exc:
-                content = _fallback_reply(text, personalization, rag_block, web_block)
+                content = _fallback_reply(text, personalization, doc_hits, web_block)
                 content += f"\n\n_(LLM error: {exc})_"
         else:
-            content = _fallback_reply(text, personalization, rag_block, web_block)
+            content = _fallback_reply(text, personalization, doc_hits, web_block)
 
         result = {
             "content": content,

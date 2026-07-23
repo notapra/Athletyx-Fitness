@@ -156,3 +156,16 @@ Phase 2 exposes MCP tools `sync_healthkit_workouts` and `get_healthkit_status`.
 - Tools return `available: false` without mutating data
 - Users can continue logging workouts in IronLog; export/import arrives in a later mobile release
 """
+
+    research_dir = _CONTENT / "research"
+    if research_dir.is_dir():
+        for path in sorted(research_dir.glob("*.md")):
+            uri = f"athletyx://research/{path.stem}"
+
+            def _make_research_reader(p: Path = path):
+                def _reader() -> str:
+                    return p.read_text(encoding="utf-8")
+
+                return _reader
+
+            mcp.resource(uri)(_make_research_reader())
