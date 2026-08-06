@@ -29,11 +29,24 @@ _WEIGHT_RE = re.compile(r"(?:@|at|for|\s)(\d{2,4}(?:\.\d+)?)\s*(?:lbs?|lb|kg)?",
 _SET_RE = re.compile(r"(\d+)\s*[x×]\s*(\d+)", re.I)
 
 
-def generate_workout_routine(goal: str, split: str) -> str:
+def generate_workout_routine(goal: str, split: str, personalization: dict | None = None) -> str:
     goal_key = goal.strip().lower()
     split_key = split.strip().lower()
     routines = _MOCK_ROUTINES.get(goal_key) or _MOCK_ROUTINES["hypertrophy"]
-    return routines.get(split_key) or routines.get("push", "No routine found.")
+    routine = routines.get(split_key) or routines.get("push", "No routine found.")
+
+    if not personalization:
+        return routine
+
+    notes: list[str] = ["\n\n---\n**Personalized for you:**"]
+    for directive in personalization.get("coaching_directives", [])[:5]:
+        notes.append(f"- {directive}")
+
+    restrictions = personalization.get("personal_factors", {}).get("movement_restrictions", [])
+    if restrictions:
+        notes.append(f"- Substitutions required for: {', '.join(restrictions)}")
+
+    return routine + "\n".join(notes)
 
 
 def parse_raw_workout_log(raw_text: str) -> dict:

@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: https://placeholder.supabase.co
+          VITE_SUPABASE_ANON_KEY: placeholder-anon-key
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r athletyx/requirements.txt pytest
+      - run: python -m pytest athletyx/backend/tests athletyx.mcp/tests -q
+        env:
+          PYTHONPATH: athletyx
+      - run: node scripts/test-nutrition.mjs
+      - run: node scripts/test-api-urls.mjs
+      - name: Live API smoke (uvicorn + smoke-test.mjs)
+        run: |
+          PYTHONPATH=athletyx python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 &
+          sleep 4
+          node scripts/smoke-test.mjs http://127.0.0.1:8000
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:e2e
+
+  mobile-web:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          VITE_ATHLETYX_API_URL: ${{ secrets.VITE_ATHLETYX_API_URL }}
+          VITE_SENTRY_DSN: ${{ secrets.VITE_SENTRY_DSN }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ironlog-web-dist
+          path: dist/
+          retention-days: 30

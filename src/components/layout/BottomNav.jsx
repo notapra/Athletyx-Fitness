@@ -1,9 +1,10 @@
 import { motion } from 'framer-motion'
-import { Home, Dumbbell, BarChart3, Sparkles, User } from 'lucide-react'
+import { Home, Dumbbell, BarChart3, Apple, Sparkles, User } from 'lucide-react'
 
 const TABS = [
   { id: 'home', label: 'Home', icon: Home },
   { id: 'workouts', label: 'Workouts', icon: Dumbbell },
+  { id: 'nutrition', label: 'Nutrition', icon: Apple },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
   { id: 'ai-trainer', label: 'AI Trainer', icon: Sparkles },
   { id: 'profile', label: 'Profile', icon: User },
@@ -22,6 +23,7 @@ export default function BottomNav({ activeTab, onTabChange }) {
             <button
               key={id}
               type="button"
+              data-testid={`nav-${id}`}
               onClick={() => onTabChange(id)}
               className="relative flex min-h-[52px] min-w-[56px] flex-1 flex-col items-center justify-center gap-1 rounded-2xl px-1 transition-colors active:scale-95"
             >

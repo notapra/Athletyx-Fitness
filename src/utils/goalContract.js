@@ -7,6 +7,8 @@
  * - Guardian classifyUserMessage / countGoalKeywords (offline alignment checks)
  */
 
+import { getPersonalFactors } from './personalFactors.js'
+
 const TRAINING_KEYWORDS = [
   'workout', 'train', 'lift', 'gym', 'exercise', 'set', 'rep', 'weight', 'bench',
   'squat', 'deadlift', 'press', 'pull', 'push', 'leg', 'muscle', 'hypertrophy',
@@ -42,6 +44,7 @@ export function buildGoalContract(profile, goals = [], sessions = []) {
   const primaryGoal = String(profile?.fitness_goal ?? '').trim()
   const aiPrefs = profile?.ai_preferences ?? {}
   const constraints = Array.isArray(aiPrefs.constraints) ? aiPrefs.constraints : []
+  const personalFactors = getPersonalFactors(profile)
   const weeklyTarget = aiPrefs.weekly_session_target ?? null
 
   const keywords = new Set(TRAINING_KEYWORDS)
@@ -85,6 +88,8 @@ export function buildGoalContract(profile, goals = [], sessions = []) {
   return {
     primaryGoal: primaryGoal || 'General strength and consistency',
     experienceLevel: profile?.experience_level ?? 'intermediate',
+    age: profile?.age ?? null,
+    personalFactors,
     activeGoals: activeGoals.map((g) => ({
       title: g.title,
       target: g.target,
@@ -113,15 +118,33 @@ export function contractToPromptBlock(contract) {
       ? contract.constraints.map((c) => `- ${c}`).join('\n')
       : '- None specified'
 
+  const pf = contract.personalFactors ?? {}
+  const injuries =
+    (pf.injury_history ?? []).length > 0
+      ? pf.injury_history.map((i) => `- ${i}`).join('\n')
+      : '- None reported'
+  const restrictions =
+    (pf.movement_restrictions ?? []).length > 0
+      ? pf.movement_restrictions.map((r) => `- ${r}`).join('\n')
+      : '- None specified'
+
   return `
 GOAL CONTRACT (monitored by Goal Guardian — non-negotiable):
 - Primary fitness goal: ${contract.primaryGoal}
 - Experience level: ${contract.experienceLevel}
+${contract.age != null ? `- Age: ${contract.age}` : ''}
+- Max effort level: ${pf.max_effort_level ?? 'moderate'}
+- Recovery capacity: ${pf.recovery_capacity ?? 'average'}
+- Injury history:
+${injuries}
+- Movement restrictions (never prescribe):
+${restrictions}
 - Active sub-goals:
 ${goalsList}
 - User constraints:
 ${constraintsList}
 ${contract.weeklySessionTarget ? `- Weekly session target: ${contract.weeklySessionTarget}` : ''}
+${pf.notes ? `- Personal notes: ${pf.notes}` : ''}
 
 COACHING RULES:
 - Every response must connect to the primary goal or an active sub-goal when possible.

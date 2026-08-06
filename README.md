@@ -25,10 +25,14 @@ All major feature plans are checked into the repo for easy browsing on GitHub:
 
 ```bash
 npm install
-npm run dev
+cp PRIVATE.env.example PRIVATE.env   # add SerpAPI + OpenAI keys (gitignored)
+npm run dev:api                      # terminal 1 — Athletyx RAG + web search API
+npm run dev                          # terminal 2 — IronLog UI
 ```
 
-Open http://localhost:5173
+Open http://localhost:5173 — IronCoach uses Athletyx when the API is running.
+
+**Secrets:** see [SECRETS.md](SECRETS.md). Keys live in `PRIVATE.env` only — never committed.
 
 ## Athletyx API + chat UI
 

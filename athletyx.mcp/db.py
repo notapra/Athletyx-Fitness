@@ -8,11 +8,14 @@ import os
 import sys
 from contextlib import contextmanager
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 import psycopg2
 from dotenv import load_dotenv
 from psycopg2.extras import Json, RealDictCursor
+
+_ROOT = Path(__file__).resolve().parent
 
 from models import (
     AuditEntry,
@@ -20,13 +23,16 @@ from models import (
     ExerciseEntryDetail,
     Goal,
     GoalContract,
+    PersonalFactors,
     SetRecord,
     User,
     WorkoutSessionDetail,
     WorkoutSessionSummary,
 )
+from personalization import merge_personal_factors
 
-load_dotenv()
+# Always load athletyx.mcp/.env regardless of process cwd (MCP clients use absolute paths).
+load_dotenv(_ROOT / ".env")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +43,7 @@ logger = logging.getLogger(__name__)
 
 _USER_COLUMNS = (
     "id, name, email, fitness_goal, experience_level, "
-    "units, bodyweight, ai_enabled"
+    "units, bodyweight, ai_enabled, age, constraints, personal_factors"
 )
 
 
@@ -70,7 +76,17 @@ def get_connection():
 def _row_to_user(row: dict[str, Any] | None) -> User | None:
     if row is None:
         return None
-    return User.model_validate(dict(row))
+    data = dict(row)
+    raw_constraints = data.get("constraints")
+    if isinstance(raw_constraints, str):
+        data["constraints"] = json.loads(raw_constraints)
+    elif raw_constraints is None:
+        data["constraints"] = []
+    raw_factors = data.get("personal_factors")
+    if isinstance(raw_factors, str):
+        raw_factors = json.loads(raw_factors)
+    data["personal_factors"] = PersonalFactors.model_validate(raw_factors or {})
+    return User.model_validate(data)
 
 
 def _iso(value: Any) -> str | None:
@@ -158,10 +174,20 @@ def update_user_preferences(
     units: str | None = None,
     bodyweight: float | None = None,
     ai_enabled: bool | None = None,
+    age: int | None = None,
     constraints: list[str] | None = None,
+    personal_factors: dict | None = None,
 ) -> User | None:
     fields: list[str] = []
     params: list[Any] = []
+
+    if personal_factors is not None:
+        existing = fetch_user_by_id(user_id)
+        merged = merge_personal_factors(
+            existing.personal_factors.model_dump() if existing else None,
+            personal_factors,
+        )
+        personal_factors = merged
 
     mapping: list[tuple[str, Any]] = [
         ("fitness_goal", fitness_goal),
@@ -169,7 +195,9 @@ def update_user_preferences(
         ("units", units),
         ("bodyweight", bodyweight),
         ("ai_enabled", ai_enabled),
+        ("age", age),
         ("constraints", Json(constraints) if constraints is not None else None),
+        ("personal_factors", Json(personal_factors) if personal_factors is not None else None),
     ]
     for column, value in mapping:
         if value is not None:
@@ -296,28 +324,33 @@ def complete_goal(user_id: int, goal_id: int) -> Goal | None:
 
 
 def build_goal_contract(user_id: int) -> GoalContract | None:
+    from personalization import build_personalization_context
+
     user = fetch_user_by_id(user_id)
     if user is None:
         return None
 
-    sql = "SELECT constraints FROM users WHERE id = %s"
-    with get_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute(sql, (user_id,))
-            row = cur.fetchone()
-    raw_constraints = row[0] if row else []
-    if isinstance(raw_constraints, str):
-        constraints = json.loads(raw_constraints)
-    else:
-        constraints = raw_constraints or []
-
+    ctx = build_personalization_context(user, None)
     return GoalContract(
         primary_goal=user.fitness_goal,
         experience_level=user.experience_level,
         active_goals=fetch_active_goals(user_id),
-        constraints=constraints,
+        constraints=user.constraints,
         units=user.units,
+        age=user.age,
+        personal_factors=user.personal_factors,
+        coaching_directives=ctx["coaching_directives"],
     )
+
+
+def fetch_personalization_context(user_id: int) -> dict | None:
+    from personalization import build_personalization_context
+
+    user = fetch_user_by_id(user_id)
+    if user is None:
+        return None
+    contract = build_goal_contract(user_id)
+    return build_personalization_context(user, contract)
 
 
 # ---------------------------------------------------------------------------
@@ -498,3 +531,169 @@ def fetch_audit_log(user_id: int, limit: int = 50) -> list[AuditEntry]:
         data["created_at"] = _iso(data.get("created_at"))
         entries.append(AuditEntry.model_validate(data))
     return entries
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Chat, Guardian, Account
+# ---------------------------------------------------------------------------
+
+def fetch_chat_history(user_id: int, limit: int = 50) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(limit, 200))
+    sql = """
+        SELECT id, role, message, created_at
+        FROM ai_chat_history
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, safe_limit))
+            rows = cur.fetchall()
+    out = []
+    for row in reversed(rows or []):
+        data = dict(row)
+        data["id"] = str(data["id"])
+        data["created_at"] = _iso(data.get("created_at"))
+        out.append(data)
+    return out
+
+
+def append_chat_message(user_id: int, role: str, message: str) -> dict[str, Any]:
+    sql = """
+        INSERT INTO ai_chat_history (user_id, role, message)
+        VALUES (%s, %s, %s)
+        RETURNING id, role, message, created_at
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, role, message))
+            row = cur.fetchone()
+        conn.commit()
+    data = dict(row)
+    data["id"] = str(data["id"])
+    data["created_at"] = _iso(data.get("created_at"))
+    record_audit(user_id, "append_chat_message", "ai_chat_history", {"role": role})
+    return data
+
+
+def record_guardian_check(
+    user_id: int,
+    check_type: str,
+    drift_score: int,
+    aligned: bool,
+    coach_excerpt: str | None = None,
+    payload: dict | None = None,
+) -> dict[str, Any]:
+    sql = """
+        INSERT INTO guardian_checks
+            (user_id, check_type, drift_score, aligned, coach_excerpt, payload)
+        VALUES (%s, %s, %s, %s, %s, %s)
+        RETURNING id, check_type, drift_score, aligned, coach_excerpt, created_at
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(
+                sql,
+                (
+                    user_id,
+                    check_type,
+                    int(drift_score),
+                    bool(aligned),
+                    coach_excerpt,
+                    Json(payload or {}),
+                ),
+            )
+            row = cur.fetchone()
+        conn.commit()
+    data = dict(row)
+    data["id"] = str(data["id"])
+    data["created_at"] = _iso(data.get("created_at"))
+    return data
+
+
+def fetch_guardian_history(user_id: int, limit: int = 25) -> list[dict[str, Any]]:
+    safe_limit = max(1, min(limit, 100))
+    sql = """
+        SELECT id, check_type, drift_score, aligned, coach_excerpt, payload, created_at
+        FROM guardian_checks
+        WHERE user_id = %s
+        ORDER BY created_at DESC
+        LIMIT %s
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id, safe_limit))
+            rows = cur.fetchall()
+    out = []
+    for row in rows or []:
+        data = dict(row)
+        data["id"] = str(data["id"])
+        if isinstance(data.get("payload"), str):
+            data["payload"] = json.loads(data["payload"])
+        data["created_at"] = _iso(data.get("created_at"))
+        out.append(data)
+    return out
+
+
+def export_user_data(user_id: int) -> dict[str, Any]:
+    user = fetch_user_by_id(user_id)
+    return {
+        "exported_at": datetime.utcnow().isoformat() + "Z",
+        "profile": user.model_dump() if user else None,
+        "goals": [g.model_dump() for g in fetch_active_goals(user_id)],
+        "workout_sessions": [s.model_dump() for s in fetch_workout_sessions(user_id, limit=50)],
+        "ai_chat_history": fetch_chat_history(user_id, limit=200),
+        "guardian_checks": fetch_guardian_history(user_id, limit=100),
+        "consents": fetch_consents(user_id).model_dump(),
+        "audit_log": [a.model_dump() for a in fetch_audit_log(user_id, limit=100)],
+    }
+
+
+def request_account_deletion(user_id: int) -> dict[str, Any]:
+    sql = """
+        INSERT INTO account_deletion_requests (user_id)
+        VALUES (%s)
+        RETURNING id, user_id, requested_at, scheduled_purge_at, status
+    """
+    with get_connection() as conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(sql, (user_id,))
+            row = cur.fetchone()
+        conn.commit()
+    data = dict(row)
+    data["id"] = str(data["id"])
+    data["user_id"] = str(data["user_id"])
+    data["requested_at"] = _iso(data.get("requested_at"))
+    data["scheduled_purge_at"] = _iso(data.get("scheduled_purge_at"))
+    record_audit(user_id, "request_account_deletion", "account_deletion_requests", {})
+    return data
+
+
+# Phase 3: swap to Supabase PostgREST backend (UUID profiles + RLS via JWT).
+if os.getenv("ATHLETYX_DB_BACKEND", "local").lower() == "supabase":
+    from db_supabase import (  # noqa: E402,F401
+        append_chat_message,
+        build_goal_contract,
+        complete_goal,
+        create_goal,
+        create_workout_session,
+        export_user_data,
+        fetch_active_goals,
+        fetch_audit_log,
+        fetch_chat_history,
+        fetch_consents,
+        fetch_guardian_history,
+        fetch_personalization_context,
+        fetch_user_by_email,
+        fetch_user_by_id,
+        fetch_users_by_profile,
+        fetch_workout_session_detail,
+        fetch_workout_sessions,
+        log_exercise_sets,
+        record_audit,
+        record_guardian_check,
+        request_account_deletion,
+        update_user_preferences,
+        upsert_consents,
+    )

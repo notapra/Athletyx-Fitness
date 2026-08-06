@@ -1,4 +1,5 @@
 import { DEFAULT_GUARDIAN_PREFS } from './goalContract.js'
+import { clearNutritionStorage } from './nutritionStorage.js'
 
 export const LOCAL_USER_ID = 'local'
 
@@ -91,7 +92,18 @@ export function getDefaultProfile() {
     experience_level: 'intermediate',
     units: 'lbs',
     dark_mode: true,
-    ai_preferences: { constraints: [] },
+    age: null,
+    ai_preferences: {
+      constraints: [],
+      personal_factors: {
+        max_effort_level: 'moderate',
+        injury_history: [],
+        movement_restrictions: [],
+        recovery_capacity: 'average',
+        medical_clearance: true,
+        notes: '',
+      },
+    },
     notification_preferences: { ...DEFAULT_GUARDIAN_PREFS },
   }
 }
@@ -132,6 +144,7 @@ export function clearAllAppData() {
   localStorage.removeItem(CHAT_KEY)
   localStorage.removeItem(`${GUARDIAN_PREFIX}${LOCAL_USER_ID}`)
   localStorage.removeItem(`${GUARDIAN_PREFIX}local`)
+  clearNutritionStorage()
   try {
     sessionStorage.removeItem('gymtracker_drift_warnings')
   } catch {

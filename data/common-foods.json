@@ -1,0 +1,513 @@
+[
+  {
+    "id": "chicken_breast_cooked",
+    "name": "Chicken breast, skinless, cooked",
+    "category": "protein",
+    "aliases": ["chicken", "chicken breast", "grilled chicken", "baked chicken"],
+    "nutrients_per_100g": {
+      "calories_kcal": 165,
+      "protein_g": 31,
+      "carbs_g": 0,
+      "fat_g": 3.6,
+      "sodium_mg": 74,
+      "potassium_mg": 256,
+      "cholesterol_mg": 85
+    }
+  },
+  {
+    "id": "ground_beef_93_lean_cooked",
+    "name": "Ground beef, 93% lean, cooked",
+    "category": "protein",
+    "aliases": ["ground beef", "lean ground beef", "93/7 ground beef", "mince"],
+    "nutrients_per_100g": {
+      "calories_kcal": 173,
+      "protein_g": 27.4,
+      "carbs_g": 0,
+      "fat_g": 8,
+      "sodium_mg": 66,
+      "potassium_mg": 315,
+      "iron_mg": 2.5,
+      "cholesterol_mg": 78
+    }
+  },
+  {
+    "id": "ground_beef_80_lean_cooked",
+    "name": "Ground beef, 80% lean, cooked",
+    "category": "protein",
+    "aliases": ["80/20 ground beef", "ground beef regular"],
+    "nutrients_per_100g": {
+      "calories_kcal": 254,
+      "protein_g": 25.5,
+      "carbs_g": 0,
+      "fat_g": 17.1,
+      "sodium_mg": 72,
+      "potassium_mg": 270,
+      "iron_mg": 2.4,
+      "cholesterol_mg": 88
+    }
+  },
+  {
+    "id": "salmon_atlantic_cooked",
+    "name": "Salmon, Atlantic, cooked",
+    "category": "protein",
+    "aliases": ["salmon", "grilled salmon", "baked salmon"],
+    "nutrients_per_100g": {
+      "calories_kcal": 206,
+      "protein_g": 22.1,
+      "carbs_g": 0,
+      "fat_g": 12.4,
+      "sodium_mg": 59,
+      "potassium_mg": 384,
+      "cholesterol_mg": 63
+    }
+  },
+  {
+    "id": "tuna_canned_water",
+    "name": "Tuna, canned in water, drained",
+    "category": "protein",
+    "aliases": ["tuna", "canned tuna", "tuna fish"],
+    "nutrients_per_100g": {
+      "calories_kcal": 116,
+      "protein_g": 25.5,
+      "carbs_g": 0,
+      "fat_g": 0.8,
+      "sodium_mg": 247,
+      "potassium_mg": 179
+    }
+  },
+  {
+    "id": "turkey_breast_cooked",
+    "name": "Turkey breast, roasted",
+    "category": "protein",
+    "aliases": ["turkey", "turkey breast", "deli turkey"],
+    "nutrients_per_100g": {
+      "calories_kcal": 135,
+      "protein_g": 30.1,
+      "carbs_g": 0,
+      "fat_g": 0.7,
+      "sodium_mg": 103,
+      "potassium_mg": 249,
+      "cholesterol_mg": 65
+    }
+  },
+  {
+    "id": "egg_whole",
+    "name": "Egg, whole, raw",
+    "category": "protein",
+    "aliases": ["egg", "eggs", "whole egg", "scrambled egg"],
+    "nutrients_per_100g": {
+      "calories_kcal": 143,
+      "protein_g": 12.6,
+      "carbs_g": 0.7,
+      "fat_g": 9.5,
+      "sodium_mg": 142,
+      "potassium_mg": 138,
+      "cholesterol_mg": 372
+    }
+  },
+  {
+    "id": "egg_white",
+    "name": "Egg white, raw",
+    "category": "protein",
+    "aliases": ["egg whites", "egg white"],
+    "nutrients_per_100g": {
+      "calories_kcal": 52,
+      "protein_g": 10.9,
+      "carbs_g": 0.7,
+      "fat_g": 0.2,
+      "sodium_mg": 166,
+      "potassium_mg": 163
+    }
+  },
+  {
+    "id": "greek_yogurt_nonfat",
+    "name": "Greek yogurt, plain, nonfat",
+    "category": "protein",
+    "aliases": ["greek yogurt", "yogurt", "skyr"],
+    "nutrients_per_100g": {
+      "calories_kcal": 59,
+      "protein_g": 10.2,
+      "carbs_g": 3.6,
+      "fat_g": 0.4,
+      "sodium_mg": 36,
+      "potassium_mg": 141,
+      "calcium_mg": 110
+    }
+  },
+  {
+    "id": "cottage_cheese_lowfat",
+    "name": "Cottage cheese, 2% milkfat",
+    "category": "protein",
+    "aliases": ["cottage cheese", "cottage"],
+    "nutrients_per_100g": {
+      "calories_kcal": 84,
+      "protein_g": 11.1,
+      "carbs_g": 4.3,
+      "fat_g": 2.3,
+      "sodium_mg": 321,
+      "calcium_mg": 91
+    }
+  },
+  {
+    "id": "whey_protein_powder",
+    "name": "Whey protein powder, isolate (avg)",
+    "category": "protein",
+    "aliases": ["whey", "protein powder", "whey protein", "whey isolate"],
+    "nutrients_per_100g": {
+      "calories_kcal": 375,
+      "protein_g": 80,
+      "carbs_g": 5,
+      "fat_g": 3,
+      "sodium_mg": 200,
+      "calcium_mg": 500
+    }
+  },
+  {
+    "id": "shrimp_cooked",
+    "name": "Shrimp, cooked",
+    "category": "protein",
+    "aliases": ["shrimp", "prawns"],
+    "nutrients_per_100g": {
+      "calories_kcal": 99,
+      "protein_g": 24,
+      "carbs_g": 0.2,
+      "fat_g": 0.3,
+      "sodium_mg": 111,
+      "cholesterol_mg": 189
+    }
+  },
+  {
+    "id": "tofu_firm",
+    "name": "Tofu, firm",
+    "category": "protein",
+    "aliases": ["tofu", "soy tofu"],
+    "nutrients_per_100g": {
+      "calories_kcal": 144,
+      "protein_g": 17.3,
+      "carbs_g": 2.8,
+      "fat_g": 8.7,
+      "calcium_mg": 350,
+      "iron_mg": 2.7
+    }
+  },
+  {
+    "id": "pork_tenderloin_cooked",
+    "name": "Pork tenderloin, cooked",
+    "category": "protein",
+    "aliases": ["pork", "pork loin", "pork tenderloin"],
+    "nutrients_per_100g": {
+      "calories_kcal": 143,
+      "protein_g": 26.2,
+      "carbs_g": 0,
+      "fat_g": 3.5,
+      "sodium_mg": 57,
+      "potassium_mg": 421
+    }
+  },
+  {
+    "id": "beef_sirloin_grilled",
+    "name": "Beef, sirloin steak, grilled",
+    "category": "protein",
+    "aliases": ["steak", "sirloin", "beef steak", "beef"],
+    "nutrients_per_100g": {
+      "calories_kcal": 188,
+      "protein_g": 27.6,
+      "carbs_g": 0,
+      "fat_g": 8.5,
+      "iron_mg": 2.6,
+      "zinc_mg": 5.5,
+      "cholesterol_mg": 78
+    }
+  },
+  {
+    "id": "white_rice_cooked",
+    "name": "White rice, long-grain, cooked",
+    "category": "carb",
+    "aliases": ["rice", "white rice", "jasmine rice", "basmati rice cooked"],
+    "nutrients_per_100g": {
+      "calories_kcal": 130,
+      "protein_g": 2.7,
+      "carbs_g": 28.2,
+      "fat_g": 0.3,
+      "fiber_g": 0.4,
+      "sodium_mg": 1,
+      "potassium_mg": 35
+    }
+  },
+  {
+    "id": "brown_rice_cooked",
+    "name": "Brown rice, cooked",
+    "category": "carb",
+    "aliases": ["brown rice"],
+    "nutrients_per_100g": {
+      "calories_kcal": 112,
+      "protein_g": 2.3,
+      "carbs_g": 23.5,
+      "fat_g": 0.8,
+      "fiber_g": 1.8,
+      "magnesium_mg": 43
+    }
+  },
+  {
+    "id": "oats_rolled_dry",
+    "name": "Oats, rolled, dry",
+    "category": "carb",
+    "aliases": ["oats", "oatmeal", "rolled oats", "porridge oats"],
+    "nutrients_per_100g": {
+      "calories_kcal": 389,
+      "protein_g": 16.9,
+      "carbs_g": 66.3,
+      "fat_g": 6.9,
+      "fiber_g": 10.6,
+      "iron_mg": 4.7,
+      "magnesium_mg": 177
+    }
+  },
+  {
+    "id": "rice_cakes_plain",
+    "name": "Rice cakes, plain",
+    "category": "carb",
+    "aliases": ["rice cakes", "rice cake", "puffed rice cake"],
+    "nutrients_per_100g": {
+      "calories_kcal": 387,
+      "protein_g": 8.2,
+      "carbs_g": 81.5,
+      "fat_g": 2.8,
+      "fiber_g": 4.2,
+      "sodium_mg": 29
+    }
+  },
+  {
+    "id": "pasta_cooked",
+    "name": "Pasta, enriched, cooked",
+    "category": "carb",
+    "aliases": ["pasta", "spaghetti", "penne", "noodles cooked"],
+    "nutrients_per_100g": {
+      "calories_kcal": 131,
+      "protein_g": 5.2,
+      "carbs_g": 25.1,
+      "fat_g": 1.1,
+      "fiber_g": 1.8,
+      "iron_mg": 1.3
+    }
+  },
+  {
+    "id": "bread_whole_wheat",
+    "name": "Bread, whole wheat",
+    "category": "carb",
+    "aliases": ["whole wheat bread", "wheat bread", "bread"],
+    "nutrients_per_100g": {
+      "calories_kcal": 247,
+      "protein_g": 13.4,
+      "carbs_g": 41.3,
+      "fat_g": 3.4,
+      "fiber_g": 6,
+      "sodium_mg": 400,
+      "iron_mg": 2.5
+    }
+  },
+  {
+    "id": "sweet_potato_baked",
+    "name": "Sweet potato, baked",
+    "category": "carb",
+    "aliases": ["sweet potato", "yam"],
+    "nutrients_per_100g": {
+      "calories_kcal": 90,
+      "protein_g": 2,
+      "carbs_g": 20.7,
+      "fat_g": 0.2,
+      "fiber_g": 3.3,
+      "potassium_mg": 475,
+      "vitamin_a_mcg": 961
+    }
+  },
+  {
+    "id": "potato_baked",
+    "name": "Potato, baked, flesh only",
+    "category": "carb",
+    "aliases": ["potato", "baked potato", "russet potato"],
+    "nutrients_per_100g": {
+      "calories_kcal": 93,
+      "protein_g": 2.5,
+      "carbs_g": 21.2,
+      "fat_g": 0.1,
+      "fiber_g": 1.5,
+      "potassium_mg": 535,
+      "vitamin_c_mg": 12.6
+    }
+  },
+  {
+    "id": "quinoa_cooked",
+    "name": "Quinoa, cooked",
+    "category": "carb",
+    "aliases": ["quinoa"],
+    "nutrients_per_100g": {
+      "calories_kcal": 120,
+      "protein_g": 4.4,
+      "carbs_g": 21.3,
+      "fat_g": 1.9,
+      "fiber_g": 2.8,
+      "iron_mg": 1.5,
+      "magnesium_mg": 64
+    }
+  },
+  {
+    "id": "banana",
+    "name": "Banana, raw",
+    "category": "carb",
+    "aliases": ["banana", "bananas"],
+    "nutrients_per_100g": {
+      "calories_kcal": 89,
+      "protein_g": 1.1,
+      "carbs_g": 22.8,
+      "fat_g": 0.3,
+      "fiber_g": 2.6,
+      "potassium_mg": 358,
+      "vitamin_c_mg": 8.7
+    }
+  },
+  {
+    "id": "blueberries",
+    "name": "Blueberries, raw",
+    "category": "carb",
+    "aliases": ["blueberries", "blueberry"],
+    "nutrients_per_100g": {
+      "calories_kcal": 57,
+      "protein_g": 0.7,
+      "carbs_g": 14.5,
+      "fat_g": 0.3,
+      "fiber_g": 2.4,
+      "vitamin_c_mg": 9.7
+    }
+  },
+  {
+    "id": "black_beans_cooked",
+    "name": "Black beans, cooked",
+    "category": "carb",
+    "aliases": ["black beans", "beans"],
+    "nutrients_per_100g": {
+      "calories_kcal": 132,
+      "protein_g": 8.9,
+      "carbs_g": 23.7,
+      "fat_g": 0.5,
+      "fiber_g": 8.7,
+      "iron_mg": 2.1,
+      "potassium_mg": 355
+    }
+  },
+  {
+    "id": "olive_oil",
+    "name": "Olive oil",
+    "category": "fat",
+    "aliases": ["olive oil", "extra virgin olive oil", "evoo"],
+    "nutrients_per_100g": {
+      "calories_kcal": 884,
+      "protein_g": 0,
+      "carbs_g": 0,
+      "fat_g": 100,
+      "sodium_mg": 2,
+      "vitamin_e_mg": 14.4
+    }
+  },
+  {
+    "id": "butter",
+    "name": "Butter, salted",
+    "category": "fat",
+    "aliases": ["butter"],
+    "nutrients_per_100g": {
+      "calories_kcal": 717,
+      "protein_g": 0.9,
+      "carbs_g": 0.1,
+      "fat_g": 81.1,
+      "sodium_mg": 643,
+      "cholesterol_mg": 215
+    }
+  },
+  {
+    "id": "peanut_butter",
+    "name": "Peanut butter, smooth",
+    "category": "fat",
+    "aliases": ["peanut butter", "pb"],
+    "nutrients_per_100g": {
+      "calories_kcal": 588,
+      "protein_g": 24.1,
+      "carbs_g": 21.6,
+      "fat_g": 49.9,
+      "fiber_g": 6,
+      "sodium_mg": 459,
+      "magnesium_mg": 154
+    }
+  },
+  {
+    "id": "almonds",
+    "name": "Almonds, raw",
+    "category": "fat",
+    "aliases": ["almonds", "almond"],
+    "nutrients_per_100g": {
+      "calories_kcal": 579,
+      "protein_g": 21.2,
+      "carbs_g": 21.6,
+      "fat_g": 49.9,
+      "fiber_g": 12.5,
+      "calcium_mg": 269,
+      "magnesium_mg": 270,
+      "vitamin_e_mg": 25.6
+    }
+  },
+  {
+    "id": "avocado",
+    "name": "Avocado, raw",
+    "category": "fat",
+    "aliases": ["avocado", "guacamole base"],
+    "nutrients_per_100g": {
+      "calories_kcal": 160,
+      "protein_g": 2,
+      "carbs_g": 8.5,
+      "fat_g": 14.7,
+      "fiber_g": 6.7,
+      "potassium_mg": 485
+    }
+  },
+  {
+    "id": "coconut_oil",
+    "name": "Coconut oil",
+    "category": "fat",
+    "aliases": ["coconut oil"],
+    "nutrients_per_100g": {
+      "calories_kcal": 862,
+      "protein_g": 0,
+      "carbs_g": 0,
+      "fat_g": 100,
+      "saturated_fat_g": 82.5
+    }
+  },
+  {
+    "id": "walnuts",
+    "name": "Walnuts, English",
+    "category": "fat",
+    "aliases": ["walnuts", "walnut"],
+    "nutrients_per_100g": {
+      "calories_kcal": 654,
+      "protein_g": 15.2,
+      "carbs_g": 13.7,
+      "fat_g": 65.2,
+      "fiber_g": 6.7,
+      "magnesium_mg": 158
+    }
+  },
+  {
+    "id": "cheddar_cheese",
+    "name": "Cheddar cheese",
+    "category": "fat",
+    "aliases": ["cheddar", "cheese"],
+    "nutrients_per_100g": {
+      "calories_kcal": 403,
+      "protein_g": 22.9,
+      "carbs_g": 3.4,
+      "fat_g": 33.3,
+      "calcium_mg": 721,
+      "sodium_mg": 621,
+      "cholesterol_mg": 105
+    }
+  }
+]

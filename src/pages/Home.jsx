@@ -51,7 +51,7 @@ export default function Home({ onStartWorkout }) {
   const insights = useMemo(() => getTrainingInsights(sessions), [sessions])
   const suggestions = useMemo(() => getProgressiveOverloadSuggestions(sessions), [sessions])
   const activeGoals = goals.filter((g) => !g.completed).slice(0, 2)
-  const { muscles, muscleById } = useMuscleAnalytics({ days: 30 })
+  const { muscleById } = useMuscleAnalytics({ days: 30 })
 
   function handleQuickStart() {
     if (onStartWorkout) onStartWorkout()
@@ -68,7 +68,7 @@ export default function Home({ onStartWorkout }) {
           Tap a muscle group for your strength tier and training tips.
         </p>
         <Card className="!p-4">
-          <AnatomicalBodyMap muscles={muscles} muscleById={muscleById} />
+          <AnatomicalBodyMap muscleById={muscleById} />
         </Card>
       </section>
 
@@ -84,6 +84,7 @@ export default function Home({ onStartWorkout }) {
 
       <motion.button
         type="button"
+        data-testid="start-workout"
         whileTap={{ scale: 0.98 }}
         onClick={handleQuickStart}
         className="flex w-full items-center justify-between rounded-3xl bg-gradient-to-r from-emerald-400 via-emerald-500 to-cyan-400 p-5 shadow-2xl shadow-emerald-500/25"

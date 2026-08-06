@@ -24,7 +24,7 @@ const LEGEND = [
 const HEAD_PATH =
   'M 100 8 C 81 8 69 22 69 37 C 69 50 78 58 88 61 L 112 61 C 122 58 131 50 131 37 C 131 22 119 8 100 8 Z'
 
-export default function AnatomicalBodyMap({ muscles: _muscles, muscleById }) {
+export default function AnatomicalBodyMap({ muscleById }) {
   const { sessions } = useApp()
   const [view, setView] = useState('front')
   const [activeId, setActiveId] = useState(null)
