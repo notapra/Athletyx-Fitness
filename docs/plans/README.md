@@ -12,7 +12,7 @@ Shipped feature plans (completed work) live here in git. **Future / backlog plan
 | **06** | [MCP Phase 2 app-store tools](./06-mcp-phase2-app-store-tools.plan.md) | Completed | Analytics, Guardian, chat, account export/deletion, HealthKit stubs |
 | **07** | [Ship and operate](./07-ship-and-operate.plan.md) | Completed (code) | CI gates, built-in nutrition, ops runbooks; cloud staging = operator |
 | **08** | [Health platform integration](./08-health-platform-integration.plan.md) | Completed | HealthKit / Health Connect sync, Settings UI, Capacitor plugin |
-| **09** | [Production cutover](./09-production-cutover.plan.md) | In progress | Release PR to main, prod defaults, cutover checklist |
+| **09** | [Production cutover](./09-production-cutover.plan.md) | Ready to merge | Release PR #2 to main; CI green; operator cloud promote |
 
 ## Future notes (local only)
 

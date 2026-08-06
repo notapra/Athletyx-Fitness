@@ -13,7 +13,7 @@ todos:
     status: completed
   - id: verify-ci
     content: Local lint/test/build/accuracy/smoke; PR CI jobs green
-    status: pending
+    status: completed
 isProject: false
 ---
 
