@@ -11,7 +11,8 @@ Shipped feature plans (completed work) live here in git. **Future / backlog plan
 | **05** | [Macro & micronutrient tracker](./05-macro-micronutrient-tracker.plan.md) | Completed | Gram-based logging, USDA API + saved catalog, macros/micros, Supabase sync |
 | **06** | [MCP Phase 2 app-store tools](./06-mcp-phase2-app-store-tools.plan.md) | Completed | Analytics, Guardian, chat, account export/deletion, HealthKit stubs |
 | **07** | [Ship and operate](./07-ship-and-operate.plan.md) | Completed (code) | CI gates, built-in nutrition, ops runbooks; cloud staging = operator |
-| **08** | [Health platform integration](./08-health-platform-integration.plan.md) | In progress | HealthKit / Health Connect service + Settings; native plugins next |
+| **08** | [Health platform integration](./08-health-platform-integration.plan.md) | Completed | HealthKit / Health Connect sync, Settings UI, Capacitor plugin |
+| **09** | [Production cutover](./09-production-cutover.plan.md) | In progress | Release PR to main, prod defaults, cutover checklist |
 
 ## Future notes (local only)
 

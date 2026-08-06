@@ -18,7 +18,7 @@ todos:
     content: Live Supabase + Railway + Vercel staging (operator login)
     status: pending
   - id: merge-main
-    content: Merge PR #1 to main after CI green
+    content: Merge via Stage 09 release PR (supersedes PR #1)
     status: pending
 isProject: false
 ---

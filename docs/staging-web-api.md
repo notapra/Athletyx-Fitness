@@ -4,9 +4,9 @@ Platform CLIs (`railway`, `vercel`) are optional; dashboard deploy works the sam
 
 ## Railway (API)
 
-1. New project → Deploy from GitHub → select `Athletyx-Fitness`, branch `dynamic-api-collection-and-macro` (or `main` after merge).
+1. New project → Deploy from GitHub → select `Athletyx-Fitness`, branch `release/stage-09-production` (or `main` after Stage 09 merge).
 2. Set root / Dockerfile per `railway.toml`.
-3. Paste env from `PRIVATE.env.staging.example` (must include `REQUIRE_AUTH=true`, Supabase keys, optional `USDA_FDC_API_KEY`).
+3. Paste env from `PRIVATE.env.staging.example` (must include `REQUIRE_AUTH=true`, Supabase keys; `OPENAI_API_KEY` optional — RAG coach works without it; optional `USDA_FDC_API_KEY`).
 4. Deploy → copy public URL.
 5. Smoke:
 

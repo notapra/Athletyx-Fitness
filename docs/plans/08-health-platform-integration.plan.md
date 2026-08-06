@@ -1,6 +1,6 @@
 ---
 name: Health Platform Integration
-overview: Wire Apple HealthKit and Google Health Connect for workout import/export, with Settings UI and MCP tool alignment.
+overview: Wire Apple HealthKit and Google Health Connect for workout import/export, with Settings UI and MCP tool alignment. Status — completed on stage-08 branch.
 todos:
   - id: health-service
     content: Platform-aware healthSync service with prefs and status API

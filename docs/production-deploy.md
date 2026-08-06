@@ -36,6 +36,7 @@ supabase link --project-ref <staging-ref>
 2. Copy `PRIVATE.env.staging.example` → Railway env vars:
 
 ```
+# OPTIONAL — leave empty for RAG-only coach (no OpenAI token cost)
 OPENAI_API_KEY=
 SERPAPI_API_KEY=
 SERPAPI_ENABLED=false
@@ -105,6 +106,12 @@ npx cap open android
 npx cap open ios
 ```
 
+**Health sync (store builds):**
+
+- **iOS:** HealthKit capability + `App.entitlements`; `NSHealthShareUsageDescription` / `NSHealthUpdateUsageDescription` in `Info.plist`
+- **Android:** Health Connect privacy policy URL in `strings.xml` (`health_connect_privacy_policy_url`) and/or `assets/public/privacypolicy.html` after `cap sync`
+- Settings → Health sync: request permissions, import, enable toggle before TestFlight / Play internal testing
+
 ## Coach answer caching (API efficiency)
 
 Answers are stored at three layers (all implemented in code):
@@ -115,7 +122,7 @@ Answers are stored at three layers (all implemented in code):
 | Server | `athletyx/backend/.cache/` | Every `/api/coach` response |
 | Cloud | `coach_query_cache` table | Signed-in users |
 
-Repeat questions skip OpenAI/SerpAPI calls when cache hits.
+**OpenAI is optional.** Without `OPENAI_API_KEY`, IronCoach answers from Athletyx research RAG (ISSN protein, ACSM RT, deload, sleep, injury safety). Repeat questions still skip network work when cache hits. SerpAPI stays off unless `SERPAPI_ENABLED=true` and a key is set.
 
 ## Step 6 — Release builds (GitHub)
 
@@ -182,3 +189,16 @@ gh api repos/{owner}/{repo}/branches/main/protection -X PUT --input scripts/bran
 ### Incident capture template
 
 Use [`incident-template.md`](incident-template.md) for every Sev-1/Sev-2 event.
+
+## Stage 09 — Production cutover checklist
+
+Use this sequence to promote `release/stage-09-production` (or the merged `main`) after CI is green.
+
+1. **Staging Supabase** — run migrations listed in Step 1; confirm RLS via `staging-setup.sql` ([`staging-supabase.md`](staging-supabase.md)).
+2. **Railway staging API** — env from `PRIVATE.env.staging.example` (`REQUIRE_AUTH=true`, OpenAI optional). `GET /health` → `auth_required: "true"`. `npm run test:staging -- https://YOUR-API` passes (health + coach 401 without token + nutrition shape).
+3. **Vercel staging** — set `VITE_ATHLETYX_API_URL` to `https://YOUR-API/api/coach` (client resolves nutrition/MCP from that base).
+4. **Signed-in smoke** — auth; finish workout; Nutrition builtin search (no USDA key); AI Trainer research reply (protein/deload/sleep); Settings → MCP session load; Health sync card visible on web (native on device).
+5. **Merge** — Stage 09 PR → `main` only after required checks `frontend`, `backend`, `e2e` are green. Do not merge stale PR #1.
+6. **Promote prod** — same env pattern as staging (`REQUIRE_AUTH=true`); record rollback owner/contact; keep [`incident-template.md`](incident-template.md) handy.
+
+Operator-owned: Supabase / Railway / Vercel login and the final merge click.
