@@ -8,6 +8,7 @@ import {
   ChevronDown,
   Timer,
   X,
+  Scan,
 } from 'lucide-react'
 import { filterExerciseSuggestions, WORKOUT_SPLITS } from '../../data/exercises.js'
 import {
@@ -20,6 +21,8 @@ import {
 import { useWorkoutTimer } from '../../hooks/useWorkoutTimer.js'
 import { hapticLight, hapticSuccess } from '../../utils/haptics.js'
 import RestTimer from './RestTimer.jsx'
+import FormVisionPanel from './FormVisionPanel.jsx'
+import { getFormVisionPreferences } from '../../services/formVision.js'
 
 export default function ActiveWorkout({
   session,
@@ -34,6 +37,8 @@ export default function ActiveWorkout({
   const [split, setSplit] = useState(session.split ?? 'Upper')
   const [notes, setNotes] = useState(session.notes ?? '')
   const [finishHint, setFinishHint] = useState('')
+  const [formVisionExercise, setFormVisionExercise] = useState(null)
+  const formVisionEnabled = getFormVisionPreferences().enabled
 
   const elapsed = useWorkoutTimer(session.startedAt, true)
   const suggestions = useMemo(
@@ -261,6 +266,18 @@ export default function ActiveWorkout({
                         <Timer className="h-4 w-4" />
                         Rest
                       </button>
+                      {formVisionEnabled ? (
+                        <button
+                          type="button"
+                          data-testid="form-vision-open"
+                          onClick={() => setFormVisionExercise(block.exercise || 'Exercise')}
+                          className="flex items-center justify-center gap-1 rounded-2xl border border-cyan-500/30 px-3 py-2.5 text-xs font-semibold text-cyan-300"
+                          aria-label={`Open form check for ${block.exercise || 'exercise'}`}
+                        >
+                          <Scan className="h-4 w-4" />
+                          Form
+                        </button>
+                      ) : null}
                       <button
                         type="button"
                         onClick={() => removeExercise(exIdx)}
@@ -324,6 +341,13 @@ export default function ActiveWorkout({
       </motion.button>
 
       <RestTimer timer={restTimer} />
+
+      {formVisionExercise ? (
+        <FormVisionPanel
+          exerciseName={formVisionExercise}
+          onClose={() => setFormVisionExercise(null)}
+        />
+      ) : null}
     </div>
   )
 }

@@ -14,6 +14,7 @@ import {
   Plug,
   Copy,
   Activity,
+  Scan,
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import { useApp } from '../hooks/useApp.js'
@@ -34,6 +35,12 @@ import {
   requestHealthPermissions,
   importWorkoutsFromHealth,
 } from '../services/healthSync.js'
+import {
+  getFormVisionStatus,
+  getFormVisionPreferences,
+  setFormVisionEnabled,
+  setFormVisionPreferCamera,
+} from '../services/formVision.js'
 import LegalDocument from '../components/compliance/LegalDocument.jsx'
 import Card from '../components/ui/Card.jsx'
 
@@ -74,6 +81,13 @@ export default function Settings({ onBack }) {
     () => getHealthSyncPreferences().enabled
   )
   const [healthBusy, setHealthBusy] = useState(false)
+  const formVisionStatus = getFormVisionStatus()
+  const [formVisionEnabled, setFormVisionEnabledState] = useState(
+    () => getFormVisionPreferences().enabled
+  )
+  const [formVisionPreferCamera, setFormVisionPreferCameraState] = useState(
+    () => getFormVisionPreferences().preferCamera
+  )
   const cacheStats = getCoachCacheStats()
 
   useEffect(() => {
@@ -387,6 +401,53 @@ export default function Settings({ onBack }) {
         <p className="mt-2 text-[10px] text-zinc-600">
           Platform: {healthStatus.platform}
           {healthStatus.available ? ' · native plugin active' : ` · ${healthStatus.message}`}
+        </p>
+      </Card>
+
+      <Card className="border-cyan-500/20" data-testid="form-vision-card">
+        <h2 className="mb-1 flex items-center gap-2 text-sm font-semibold text-white">
+          <Scan className="h-4 w-4 text-cyan-400" />
+          Form Vision
+        </h2>
+        <p className="mb-3 text-xs text-zinc-500">{formVisionStatus.message}</p>
+        <label className="flex items-center justify-between">
+          <span className="text-sm text-zinc-300">Enable form check in workouts</span>
+          <input
+            type="checkbox"
+            data-testid="form-vision-toggle"
+            checked={formVisionEnabled}
+            onChange={(e) => {
+              const enabled = e.target.checked
+              setFormVisionEnabledState(enabled)
+              setFormVisionEnabled(enabled)
+              setStatusMsg(
+                enabled
+                  ? 'Form Vision enabled — open Form during a set'
+                  : 'Form Vision disabled'
+              )
+            }}
+            className="h-5 w-5 rounded accent-cyan-500"
+          />
+        </label>
+        {formVisionEnabled ? (
+          <label className="mt-3 flex items-center justify-between">
+            <span className="text-sm text-zinc-300">Prefer camera preview</span>
+            <input
+              type="checkbox"
+              data-testid="form-vision-prefer-camera"
+              checked={formVisionPreferCamera}
+              onChange={(e) => {
+                const prefer = e.target.checked
+                setFormVisionPreferCameraState(prefer)
+                setFormVisionPreferCamera(prefer)
+              }}
+              className="h-5 w-5 rounded accent-cyan-500"
+            />
+          </label>
+        ) : null}
+        <p className="mt-2 text-[10px] text-zinc-600">
+          Cue-only mode works without a camera (screen-reader friendly). Supported starters:{' '}
+          {formVisionStatus.supportedExercises.map((e) => e.title).join(', ')}.
         </p>
       </Card>
 
