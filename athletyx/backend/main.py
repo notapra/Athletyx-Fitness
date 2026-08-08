@@ -16,11 +16,17 @@ from pydantic import BaseModel, Field
 
 from backend.coaching_service import coach_with_athletyx, serpapi_available
 from backend.agent import route_message
-from backend.auth_middleware import get_cors_origins, get_current_user, get_mcp_session_user
+from backend.auth_middleware import (
+    check_form_vision_rate_limit,
+    get_cors_origins,
+    get_current_user,
+    get_mcp_session_user,
+)
 from backend.logging_middleware import RequestLoggingMiddleware
 from backend.mcp_auth import build_mcp_session_payload
 from backend.nutrition_service import fetch_food_detail, search_foods
 from backend.query_cache import get_cache_stats
+from backend.form_vision_service import analyze_form_vision, gemini_available
 
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "PRIVATE.env"))
@@ -68,17 +74,74 @@ class CoachResponse(BaseModel):
     cache: dict = Field(default_factory=dict)
 
 
+# ~200KB base64 per image * 3 ≈ safe ceiling for live JPEG frames
+_MAX_IMAGE_B64_CHARS = 280_000
+_MAX_IMAGES = 3
+
+
+class FormVisionRequest(BaseModel):
+    images: list[str] = Field(..., min_length=1, max_length=_MAX_IMAGES)
+    logged_exercise: str | None = Field(default=None, max_length=120)
+    catalog: list[str] = Field(default_factory=list, max_length=120)
+    prior_detection: str | None = Field(default=None, max_length=120)
+
+    @staticmethod
+    def _strip_data_url(value: str) -> str:
+        raw = (value or "").strip()
+        if "," in raw and raw.lower().startswith("data:"):
+            raw = raw.split(",", 1)[1]
+        return raw
+
+    def cleaned_images(self) -> list[str]:
+        out: list[str] = []
+        for img in self.images:
+            cleaned = self._strip_data_url(img)
+            if not cleaned:
+                continue
+            if len(cleaned) > _MAX_IMAGE_B64_CHARS:
+                raise ValueError("Image too large")
+            out.append(cleaned)
+        if not out:
+            raise ValueError("At least one valid image is required")
+        return out[:_MAX_IMAGES]
+
+
+class FormVisionResponse(BaseModel):
+    detected_exercise: str
+    confidence: float
+    matches_logged: bool
+    form_score: str
+    faults: list[str] = Field(default_factory=list)
+    cues: list[str] = Field(default_factory=list)
+    summary: str = ""
+    powered_by: str | None = "Gemini"
+
+
 @app.get("/health")
 def health():
+    features = [
+        "rag",
+        "personalization",
+        "ironlog_coach",
+        "jwt_auth",
+        "query_cache",
+        "mcp_session",
+        "nutrition",
+    ]
+    if serpapi_available():
+        features.append("serpapi")
+    if os.getenv("USDA_FDC_API_KEY", "").strip():
+        features.append("usda_fdc")
+    if gemini_available():
+        features.append("live_form_vision")
     return {
         "status": "ok",
         "service": "athletyx",
-        "features": ["rag", "personalization", "ironlog_coach", "jwt_auth", "query_cache", "mcp_session", "nutrition"]
-        + (["serpapi"] if serpapi_available() else [])
-        + (["usda_fdc"] if os.getenv("USDA_FDC_API_KEY", "").strip() else []),
+        "features": features,
         "auth_required": os.getenv("REQUIRE_AUTH", "false"),
         "web_search_available": serpapi_available(),
         "openai_available": bool(os.getenv("OPENAI_API_KEY", "").strip()),
+        "gemini_available": gemini_available(),
         "cache": get_cache_stats(),
     }
 
@@ -158,3 +221,39 @@ async def coach(
         use_web_search=request.use_web_search,
     )
     return CoachResponse(**result)
+
+
+@app.post("/api/form-vision", response_model=FormVisionResponse)
+async def form_vision(
+    request: FormVisionRequest,
+    user: dict | None = Depends(get_current_user),
+):
+    """Live Form Vision — detect movement + form from camera frames (Gemini)."""
+    if not gemini_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Live Form Vision unavailable — set GEMINI_API_KEY on the server",
+        )
+    user_id = (user or {}).get("id") or "anonymous"
+    check_form_vision_rate_limit(user_id)
+    try:
+        images = request.cleaned_images()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    catalog = [str(n).strip() for n in request.catalog if str(n).strip()][:120]
+    try:
+        result = analyze_form_vision(
+            images,
+            logged_exercise=request.logged_exercise,
+            catalog=catalog,
+            prior_detection=request.prior_detection,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Form vision failed: {exc}") from exc
+
+    return FormVisionResponse(**result.model_dump())

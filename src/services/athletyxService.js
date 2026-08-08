@@ -38,10 +38,17 @@ export async function getAthletyxHealth() {
       ok: data?.status === 'ok',
       webSearchAvailable: data?.web_search_available === true,
       openaiAvailable: data?.openai_available === true,
+      geminiAvailable: data?.gemini_available === true,
       features: data?.features ?? [],
     }
   } catch {
-    return { ok: false, webSearchAvailable: false, openaiAvailable: false, features: [] }
+    return {
+      ok: false,
+      webSearchAvailable: false,
+      openaiAvailable: false,
+      geminiAvailable: false,
+      features: [],
+    }
   }
 }
 
@@ -90,6 +97,49 @@ export async function sendAthletyxCoachMessage(message, { profile, goals = [], a
   if (!response.ok) {
     const text = await response.text()
     throw new Error(text || `Athletyx API error ${response.status}`)
+  }
+
+  return response.json()
+}
+
+/**
+ * Live Form Vision — send camera frames to Gemini via Athletyx.
+ * @param {{ images: string[], loggedExercise?: string, catalog?: string[], priorDetection?: string }} opts
+ */
+export async function analyzeFormVision({
+  images,
+  loggedExercise,
+  catalog = [],
+  priorDetection,
+}) {
+  const url = getAthletyxApiPath('form-vision')
+  const token = await getAccessToken()
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers.Authorization = `Bearer ${token}`
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      images,
+      logged_exercise: loggedExercise || null,
+      catalog,
+      prior_detection: priorDetection || null,
+    }),
+  })
+
+  if (!response.ok) {
+    const text = await response.text()
+    let detail = text || `Form Vision API error ${response.status}`
+    try {
+      const parsed = JSON.parse(text)
+      if (parsed?.detail) detail = typeof parsed.detail === 'string' ? parsed.detail : text
+    } catch {
+      /* keep detail */
+    }
+    const err = new Error(detail)
+    err.status = response.status
+    throw err
   }
 
   return response.json()

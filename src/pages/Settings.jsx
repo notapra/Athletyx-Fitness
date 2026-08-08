@@ -40,6 +40,8 @@ import {
   getFormVisionPreferences,
   setFormVisionEnabled,
   setFormVisionPreferCamera,
+  setFormVisionLiveEnabled,
+  setFormVisionCloudConsent,
 } from '../services/formVision.js'
 import LegalDocument from '../components/compliance/LegalDocument.jsx'
 import Card from '../components/ui/Card.jsx'
@@ -87,6 +89,12 @@ export default function Settings({ onBack }) {
   )
   const [formVisionPreferCamera, setFormVisionPreferCameraState] = useState(
     () => getFormVisionPreferences().preferCamera
+  )
+  const [formVisionLive, setFormVisionLiveState] = useState(
+    () => getFormVisionPreferences().liveVisionEnabled
+  )
+  const [formVisionConsent, setFormVisionConsentState] = useState(
+    () => getFormVisionPreferences().cloudConsent
   )
   const cacheStats = getCoachCacheStats()
 
@@ -430,20 +438,61 @@ export default function Settings({ onBack }) {
           />
         </label>
         {formVisionEnabled ? (
-          <label className="mt-3 flex items-center justify-between">
-            <span className="text-sm text-zinc-300">Prefer camera preview</span>
-            <input
-              type="checkbox"
-              data-testid="form-vision-prefer-camera"
-              checked={formVisionPreferCamera}
-              onChange={(e) => {
-                const prefer = e.target.checked
-                setFormVisionPreferCameraState(prefer)
-                setFormVisionPreferCamera(prefer)
-              }}
-              className="h-5 w-5 rounded accent-cyan-500"
-            />
-          </label>
+          <>
+            <label className="mt-3 flex items-center justify-between">
+              <span className="text-sm text-zinc-300">Prefer camera preview</span>
+              <input
+                type="checkbox"
+                data-testid="form-vision-prefer-camera"
+                checked={formVisionPreferCamera}
+                onChange={(e) => {
+                  const prefer = e.target.checked
+                  setFormVisionPreferCameraState(prefer)
+                  setFormVisionPreferCamera(prefer)
+                }}
+                className="h-5 w-5 rounded accent-cyan-500"
+              />
+            </label>
+            <label className="mt-3 flex items-center justify-between">
+              <span className="text-sm text-zinc-300">Live Vision (Gemini)</span>
+              <input
+                type="checkbox"
+                data-testid="form-vision-live-toggle"
+                checked={formVisionLive}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  setFormVisionLiveState(on)
+                  setFormVisionLiveEnabled(on)
+                }}
+                className="h-5 w-5 rounded accent-cyan-500"
+              />
+            </label>
+            <label className="mt-3 flex items-start justify-between gap-3">
+              <span className="text-sm text-zinc-300">
+                Cloud analysis consent
+                <span className="mt-1 block text-[10px] text-zinc-500">
+                  Frames are sent to Google Gemini for movement and form analysis; they are not
+                  stored by IronLog.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                data-testid="form-vision-cloud-consent"
+                checked={formVisionConsent}
+                onChange={(e) => {
+                  const on = e.target.checked
+                  setFormVisionConsentState(on)
+                  setFormVisionCloudConsent(on)
+                  setStatusMsg(
+                    on
+                      ? 'Live Vision cloud consent enabled'
+                      : 'Live Vision cloud consent disabled'
+                  )
+                }}
+                className="mt-0.5 h-5 w-5 shrink-0 rounded accent-cyan-500"
+              />
+            </label>
+          </>
         ) : null}
         <p className="mt-2 text-[10px] text-zinc-600">
           Cue-only mode works without a camera (screen-reader friendly). Supported starters:{' '}

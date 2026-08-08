@@ -16,7 +16,9 @@ _bearer_required = HTTPBearer()
 
 _jwks_cache: dict[str, Any] | None = None
 _rate_buckets: dict[str, list[float]] = defaultdict(list)
+_form_vision_buckets: dict[str, list[float]] = defaultdict(list)
 RATE_LIMIT = int(os.getenv("COACH_RATE_LIMIT_PER_HOUR", "30"))
+FORM_VISION_RATE_LIMIT = int(os.getenv("FORM_VISION_RATE_LIMIT_PER_HOUR", "60"))
 RATE_WINDOW = 3600
 
 
@@ -69,6 +71,16 @@ def check_rate_limit(user_id: str) -> None:
     if len(_rate_buckets[user_id]) >= RATE_LIMIT:
         raise HTTPException(status_code=429, detail="Coach rate limit exceeded")
     _rate_buckets[user_id].append(now)
+
+
+def check_form_vision_rate_limit(user_id: str) -> None:
+    now = time.time()
+    key = f"fv:{user_id}"
+    bucket = _form_vision_buckets[key]
+    _form_vision_buckets[key] = [t for t in bucket if now - t < RATE_WINDOW]
+    if len(_form_vision_buckets[key]) >= FORM_VISION_RATE_LIMIT:
+        raise HTTPException(status_code=429, detail="Form Vision rate limit exceeded")
+    _form_vision_buckets[key].append(now)
 
 
 async def get_current_user(

@@ -38,6 +38,7 @@ export default function ActiveWorkout({
   const [notes, setNotes] = useState(session.notes ?? '')
   const [finishHint, setFinishHint] = useState('')
   const [formVisionExercise, setFormVisionExercise] = useState(null)
+  const [formVisionExIdx, setFormVisionExIdx] = useState(null)
   const formVisionEnabled = getFormVisionPreferences().enabled
 
   const elapsed = useWorkoutTimer(session.startedAt, true)
@@ -270,7 +271,10 @@ export default function ActiveWorkout({
                         <button
                           type="button"
                           data-testid="form-vision-open"
-                          onClick={() => setFormVisionExercise(block.exercise || 'Exercise')}
+                          onClick={() => {
+                            setFormVisionExercise(block.exercise || 'Exercise')
+                            setFormVisionExIdx(exIdx)
+                          }}
                           className="flex items-center justify-center gap-1 rounded-2xl border border-cyan-500/30 px-3 py-2.5 text-xs font-semibold text-cyan-300"
                           aria-label={`Open form check for ${block.exercise || 'exercise'}`}
                         >
@@ -345,7 +349,18 @@ export default function ActiveWorkout({
       {formVisionExercise ? (
         <FormVisionPanel
           exerciseName={formVisionExercise}
-          onClose={() => setFormVisionExercise(null)}
+          onClose={() => {
+            setFormVisionExercise(null)
+            setFormVisionExIdx(null)
+          }}
+          onDetectedExercise={(name) => {
+            if (formVisionExIdx == null) return
+            const block = session.exercises?.[formVisionExIdx]
+            if (!block) return
+            updateExercise(formVisionExIdx, { ...block, exercise: name })
+            setFormVisionExercise(name)
+            hapticLight()
+          }}
         />
       ) : null}
     </div>

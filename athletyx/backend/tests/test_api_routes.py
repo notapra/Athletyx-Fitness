@@ -106,3 +106,74 @@ def test_chat_route(client):
     res = client.post("/api/chat", json={"message": "hello"})
     assert res.status_code == 200
     assert res.json().get("content")
+
+
+def test_form_vision_requires_images(client):
+    res = client.post("/api/form-vision", json={"images": []})
+    assert res.status_code == 422
+
+
+def test_form_vision_unavailable_without_key(client, monkeypatch):
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    res = client.post(
+        "/api/form-vision",
+        json={"images": ["aaaa"], "logged_exercise": "Squat", "catalog": ["Squat"]},
+    )
+    assert res.status_code == 503
+
+
+def test_form_vision_success_mocked(client, monkeypatch):
+    from backend.form_vision_service import FormVisionResult
+
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    def fake_analyze(images, **kwargs):
+        assert len(images) >= 1
+        return FormVisionResult(
+            detected_exercise="Deadlift",
+            confidence=0.91,
+            matches_logged=False,
+            form_score="needs_work",
+            faults=["Hips rising faster than the bar"],
+            cues=["Keep the bar close; drive the floor away"],
+            summary="Looks like a deadlift, not a squat.",
+            powered_by="Gemini (test)",
+        )
+
+    monkeypatch.setattr("backend.main.analyze_form_vision", fake_analyze)
+    monkeypatch.setattr("backend.main.gemini_available", lambda: True)
+
+    res = client.post(
+        "/api/form-vision",
+        json={
+            "images": ["YWFhYQ=="],
+            "logged_exercise": "Squat",
+            "catalog": ["Squat", "Deadlift", "Bench Press"],
+        },
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["detected_exercise"] == "Deadlift"
+    assert body["matches_logged"] is False
+    assert body["cues"]
+    assert body["confidence"] == 0.91
+
+
+def test_form_vision_requires_auth_when_enabled(client, monkeypatch):
+    monkeypatch.setenv("REQUIRE_AUTH", "true")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    monkeypatch.setattr("backend.main.gemini_available", lambda: True)
+    res = client.post(
+        "/api/form-vision",
+        json={"images": ["YWFhYQ=="], "logged_exercise": "Squat"},
+    )
+    assert res.status_code == 401
+
+
+def test_health_includes_gemini_flag(client, monkeypatch):
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    res = client.get("/health")
+    assert res.status_code == 200
+    data = res.json()
+    assert data.get("gemini_available") is True
+    assert "live_form_vision" in data["features"]

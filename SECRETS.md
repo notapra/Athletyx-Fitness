@@ -26,6 +26,9 @@ cp .env.example .env
 | `VITE_ATHLETYX_API_URL` | Frontend `.env` | Hosted coach endpoint |
 | `VITE_SENTRY_DSN` | Frontend `.env` | Optional error tracking |
 | `OPENAI_API_KEY` | `PRIVATE.env` | Athletyx backend only |
+| `GEMINI_API_KEY` | `PRIVATE.env` | Live Form Vision (Google AI Studio) |
+| `GEMINI_VISION_MODEL` | `PRIVATE.env` | Optional; default `gemini-2.0-flash` |
+| `FORM_VISION_RATE_LIMIT_PER_HOUR` | `PRIVATE.env` | Default 60 |
 | `SERPAPI_API_KEY` | `PRIVATE.env` | Athletyx backend only |
 | `SERPAPI_ENABLED` | `PRIVATE.env` | Set `true` to allow web search; default `false` |
 | `SUPABASE_URL` | `PRIVATE.env` | JWT validation on API |
@@ -44,7 +47,7 @@ cp .env.example .env
 
 ## Browser rule
 
-Only `VITE_*` variables are visible in the React app. **Do not** put `OPENAI_API_KEY` or `SERPAPI_API_KEY` in `VITE_*`.
+Only `VITE_*` variables are visible in the React app. **Do not** put `OPENAI_API_KEY`, `GEMINI_API_KEY`, or `SERPAPI_API_KEY` in `VITE_*`.
 
 ## Staging vs production
 
@@ -52,4 +55,4 @@ Use separate Supabase projects and Railway/Vercel environments. GitHub Actions u
 
 ## If a key leaks
 
-Rotate at [OpenAI](https://platform.openai.com/) / [SerpAPI](https://serpapi.com/) / Supabase dashboard and update `PRIVATE.env` only.
+Rotate at [OpenAI](https://platform.openai.com/) / [Google AI Studio](https://aistudio.google.com/apikey) / [SerpAPI](https://serpapi.com/) / Supabase dashboard and update `PRIVATE.env` only.

@@ -1,53 +1,88 @@
 /**
  * Form Vision panel — accessible opt-in form check during a set.
- * Cue mode (default for a11y) needs no camera; camera is optional preview.
+ * Cue mode (default for a11y) needs no camera; Camera is preview;
+ * Live Vision samples frames and uses Gemini via Athletyx.
  */
 
 import { useEffect, useId, useRef, useState } from 'react'
-import { Camera, Eye, EyeOff, X } from 'lucide-react'
+import { Camera, Eye, EyeOff, Loader2, Radio, X } from 'lucide-react'
 import {
+  captureVideoFrames,
   getFormCuesForExercise,
   getFormVisionPreferences,
+  LIVE_VISION_FRAME_GAP_MS,
+  LIVE_VISION_INTERVAL_MS,
   markFormVisionOpened,
   requestCameraStream,
   stopMediaStream,
 } from '../../services/formVision.js'
+import { analyzeFormVision, getAthletyxHealth } from '../../services/athletyxService.js'
+import { EXERCISE_DATABASE } from '../../data/exercises.js'
 
-export default function FormVisionPanel({ exerciseName, onClose }) {
+const CATALOG = EXERCISE_DATABASE.map((e) => e.name)
+
+/** @typedef {'cue' | 'camera' | 'live'} VisionMode */
+
+export default function FormVisionPanel({ exerciseName, onClose, onDetectedExercise }) {
   const titleId = useId()
   const descId = useId()
   const liveId = useId()
   const closeRef = useRef(null)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const analysisGenRef = useRef(0)
+  const inFlightRef = useRef(false)
+  const priorDetectionRef = useRef(null)
 
   const cueSet = getFormCuesForExercise(exerciseName)
   const prefs = getFormVisionPreferences()
-  const [useCamera, setUseCamera] = useState(Boolean(prefs.preferCamera))
+
+  const initialMode = (() => {
+    if (prefs.preferCamera && prefs.liveVisionEnabled && prefs.cloudConsent) return 'live'
+    if (prefs.preferCamera) return 'camera'
+    return 'cue'
+  })()
+
+  /** @type {[VisionMode, function]} */
+  const [mode, setMode] = useState(initialMode)
   const [cueIndex, setCueIndex] = useState(0)
   const [cameraError, setCameraError] = useState('')
   const [cameraReady, setCameraReady] = useState(false)
+  const [geminiOk, setGeminiOk] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [liveError, setLiveError] = useState('')
+  const [analysis, setAnalysis] = useState(null)
 
+  const useCamera = mode === 'camera' || mode === 'live'
   const activeCue = cueSet.cues[cueIndex] ?? cueSet.cues[0]
+  const liveCue =
+    analysis?.cues?.[0] ||
+    analysis?.summary ||
+    (analyzing ? 'Analyzing movement…' : 'Live Vision will describe your movement here.')
 
   useEffect(() => {
     markFormVisionOpened()
     closeRef.current?.focus()
+    getAthletyxHealth().then((h) => {
+      setGeminiOk(Boolean(h.ok && (h.geminiAvailable || h.features?.includes('live_form_vision'))))
+    })
   }, [])
 
   useEffect(() => {
     function onKey(e) {
       if (e.key === 'Escape') onClose?.()
-      if (e.key === 'ArrowRight') {
-        setCueIndex((i) => (i + 1) % cueSet.cues.length)
-      }
-      if (e.key === 'ArrowLeft') {
-        setCueIndex((i) => (i - 1 + cueSet.cues.length) % cueSet.cues.length)
+      if (mode !== 'live') {
+        if (e.key === 'ArrowRight') {
+          setCueIndex((i) => (i + 1) % cueSet.cues.length)
+        }
+        if (e.key === 'ArrowLeft') {
+          setCueIndex((i) => (i - 1 + cueSet.cues.length) % cueSet.cues.length)
+        }
       }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [cueSet.cues.length, onClose])
+  }, [cueSet.cues.length, onClose, mode])
 
   useEffect(() => {
     let cancelled = false
@@ -72,7 +107,7 @@ export default function FormVisionPanel({ exerciseName, onClose }) {
         }
       } catch (err) {
         setCameraError(err?.message || 'Could not open camera.')
-        setUseCamera(false)
+        setMode('cue')
       }
     }
 
@@ -83,6 +118,103 @@ export default function FormVisionPanel({ exerciseName, onClose }) {
       streamRef.current = null
     }
   }, [useCamera])
+
+  // Live Vision polling loop
+  useEffect(() => {
+    if (mode !== 'live' || !cameraReady) return undefined
+    if (!prefs.cloudConsent) {
+      setLiveError('Enable cloud analysis consent in Settings to use Live Vision.')
+      return undefined
+    }
+
+    let cancelled = false
+    let timerId = null
+
+    async function tick() {
+      if (cancelled) return
+      if (document.visibilityState === 'hidden') {
+        timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+        return
+      }
+      if (inFlightRef.current) {
+        timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+        return
+      }
+
+      const video = videoRef.current
+      if (!video || video.readyState < 2) {
+        timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+        return
+      }
+
+      const gen = ++analysisGenRef.current
+      inFlightRef.current = true
+      setAnalyzing(true)
+      setLiveError('')
+
+      try {
+        const images = await captureVideoFrames(video, {
+          count: 2,
+          intervalMs: LIVE_VISION_FRAME_GAP_MS,
+          maxWidth: 640,
+          quality: 0.7,
+        })
+        if (cancelled || gen !== analysisGenRef.current) return
+
+        const result = await analyzeFormVision({
+          images,
+          loggedExercise: exerciseName,
+          catalog: CATALOG,
+          priorDetection: priorDetectionRef.current || undefined,
+        })
+        if (cancelled || gen !== analysisGenRef.current) return
+
+        priorDetectionRef.current = result.detected_exercise
+        setAnalysis(result)
+      } catch (err) {
+        if (cancelled || gen !== analysisGenRef.current) return
+        setLiveError(err?.message || 'Live Vision analysis failed.')
+      } finally {
+        if (gen === analysisGenRef.current) {
+          inFlightRef.current = false
+          setAnalyzing(false)
+        }
+        if (!cancelled) {
+          timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+        }
+      }
+    }
+
+    timerId = window.setTimeout(tick, 600)
+    return () => {
+      cancelled = true
+      analysisGenRef.current += 1
+      inFlightRef.current = false
+      if (timerId) window.clearTimeout(timerId)
+    }
+  }, [mode, cameraReady, exerciseName, prefs.cloudConsent])
+
+  function selectMode(next) {
+    if (next === 'live') {
+      if (!prefs.cloudConsent) {
+        setLiveError('Enable cloud analysis consent in Settings first.')
+        setMode('camera')
+        return
+      }
+      if (geminiOk === false) {
+        setLiveError('Live Vision API unavailable — set GEMINI_API_KEY on the Athletyx server.')
+      }
+    }
+    setLiveError('')
+    setMode(next)
+  }
+
+  const mismatch =
+    analysis &&
+    exerciseName &&
+    analysis.matches_logged === false &&
+    analysis.detected_exercise &&
+    analysis.detected_exercise.toLowerCase() !== String(exerciseName).toLowerCase()
 
   return (
     <div
@@ -106,8 +238,8 @@ export default function FormVisionPanel({ exerciseName, onClose }) {
               Form check — {cueSet.title}
             </h2>
             <p id={descId} className="mt-1 text-xs text-zinc-500">
-              Opt-in coaching. Camera is optional. Cues are announced for screen readers.
-              Not medical advice — stop if you feel sharp pain.
+              Opt-in coaching. Live Vision detects your movement with Gemini. Not medical advice —
+              stop if you feel sharp pain.
             </p>
           </div>
           <button
@@ -126,13 +258,13 @@ export default function FormVisionPanel({ exerciseName, onClose }) {
           <button
             type="button"
             data-testid="form-vision-cue-mode"
-            onClick={() => setUseCamera(false)}
+            onClick={() => selectMode('cue')}
             className={`flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs ${
-              !useCamera
+              mode === 'cue'
                 ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
                 : 'border-zinc-700 text-zinc-400'
             }`}
-            aria-pressed={!useCamera}
+            aria-pressed={mode === 'cue'}
           >
             <EyeOff className="h-3.5 w-3.5" />
             Cue only
@@ -140,16 +272,30 @@ export default function FormVisionPanel({ exerciseName, onClose }) {
           <button
             type="button"
             data-testid="form-vision-camera-mode"
-            onClick={() => setUseCamera(true)}
+            onClick={() => selectMode('camera')}
             className={`flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs ${
-              useCamera
+              mode === 'camera'
                 ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
                 : 'border-zinc-700 text-zinc-400'
             }`}
-            aria-pressed={useCamera}
+            aria-pressed={mode === 'camera'}
           >
             <Camera className="h-3.5 w-3.5" />
-            Camera preview
+            Camera
+          </button>
+          <button
+            type="button"
+            data-testid="form-vision-live-mode"
+            onClick={() => selectMode('live')}
+            className={`flex items-center gap-1 rounded-xl border px-3 py-1.5 text-xs ${
+              mode === 'live'
+                ? 'border-cyan-500/40 bg-cyan-500/10 text-cyan-200'
+                : 'border-zinc-700 text-zinc-400'
+            }`}
+            aria-pressed={mode === 'live'}
+          >
+            <Radio className="h-3.5 w-3.5" />
+            Live Vision
           </button>
         </div>
 
@@ -160,10 +306,25 @@ export default function FormVisionPanel({ exerciseName, onClose }) {
               className="aspect-video w-full object-cover"
               playsInline
               muted
-              aria-label="Live camera preview for form self-check"
+              aria-label="Live camera preview for form coaching"
             />
             {!cameraReady && !cameraError ? (
               <p className="p-3 text-center text-xs text-zinc-500">Starting camera…</p>
+            ) : null}
+            {mode === 'live' && cameraReady ? (
+              <div className="flex items-center justify-between gap-2 border-t border-zinc-800 bg-zinc-950/90 px-3 py-2 text-[10px] text-zinc-400">
+                <span className="inline-flex items-center gap-1.5">
+                  {analyzing ? (
+                    <Loader2 className="h-3 w-3 animate-spin text-cyan-400" aria-hidden />
+                  ) : (
+                    <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
+                  )}
+                  {analyzing ? 'Analyzing…' : 'Listening for movement'}
+                </span>
+                {analysis?.confidence != null ? (
+                  <span>{Math.round(analysis.confidence * 100)}% confidence</span>
+                ) : null}
+              </div>
             ) : null}
           </div>
         ) : (
@@ -182,44 +343,113 @@ export default function FormVisionPanel({ exerciseName, onClose }) {
           </p>
         ) : null}
 
-        <div
-          id={liveId}
-          role="status"
-          aria-live="polite"
-          aria-atomic="true"
-          data-testid="form-vision-cue"
-          className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-zinc-100"
-        >
-          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-400">
-            Cue {cueIndex + 1} of {cueSet.cues.length}
+        {liveError ? (
+          <p className="mb-3 text-xs text-amber-400" role="alert" data-testid="form-vision-live-error">
+            {liveError}
           </p>
-          <p>{activeCue}</p>
-        </div>
+        ) : null}
 
-        <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            data-testid="form-vision-prev-cue"
-            onClick={() =>
-              setCueIndex((i) => (i - 1 + cueSet.cues.length) % cueSet.cues.length)
-            }
-            className="flex-1 rounded-2xl border border-zinc-700 py-2.5 text-xs font-semibold text-zinc-300"
+        {mismatch ? (
+          <div
+            className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3"
+            data-testid="form-vision-mismatch"
           >
-            Previous cue
-          </button>
-          <button
-            type="button"
-            data-testid="form-vision-next-cue"
-            onClick={() => setCueIndex((i) => (i + 1) % cueSet.cues.length)}
-            className="flex-1 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 py-2.5 text-xs font-semibold text-cyan-200"
-          >
-            Next cue
-          </button>
-        </div>
+            <p className="text-xs font-semibold text-amber-200">Movement mismatch</p>
+            <p className="mt-1 text-xs text-amber-100/90">
+              Logged <span className="font-medium">{exerciseName}</span>, but Live Vision sees{' '}
+              <span className="font-medium">{analysis.detected_exercise}</span>.
+            </p>
+            {typeof onDetectedExercise === 'function' ? (
+              <button
+                type="button"
+                data-testid="form-vision-use-detected"
+                onClick={() => onDetectedExercise(analysis.detected_exercise)}
+                className="mt-2 w-full rounded-xl border border-amber-500/40 bg-amber-500/20 py-2 text-xs font-semibold text-amber-100"
+              >
+                Use detected exercise
+              </button>
+            ) : null}
+          </div>
+        ) : null}
+
+        {mode === 'live' ? (
+          <>
+            {analysis?.detected_exercise ? (
+              <p
+                className="mb-2 text-xs text-zinc-400"
+                data-testid="form-vision-detected"
+              >
+                Detected:{' '}
+                <span className="font-semibold text-cyan-200">{analysis.detected_exercise}</span>
+                {analysis.form_score && analysis.form_score !== 'unknown' ? (
+                  <span className="text-zinc-500"> · form {analysis.form_score.replace('_', ' ')}</span>
+                ) : null}
+              </p>
+            ) : null}
+            <div
+              id={liveId}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="form-vision-live-cue"
+              className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-zinc-100"
+            >
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-400">
+                Live cue
+              </p>
+              <p>{liveCue}</p>
+            </div>
+            {analysis?.faults?.length ? (
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-zinc-400">
+                {analysis.faults.slice(0, 4).map((f) => (
+                  <li key={f}>{f}</li>
+                ))}
+              </ul>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <div
+              id={liveId}
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              data-testid="form-vision-cue"
+              className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-zinc-100"
+            >
+              <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-400">
+                Cue {cueIndex + 1} of {cueSet.cues.length}
+              </p>
+              <p>{activeCue}</p>
+            </div>
+
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                data-testid="form-vision-prev-cue"
+                onClick={() =>
+                  setCueIndex((i) => (i - 1 + cueSet.cues.length) % cueSet.cues.length)
+                }
+                className="flex-1 rounded-2xl border border-zinc-700 py-2.5 text-xs font-semibold text-zinc-300"
+              >
+                Previous cue
+              </button>
+              <button
+                type="button"
+                data-testid="form-vision-next-cue"
+                onClick={() => setCueIndex((i) => (i + 1) % cueSet.cues.length)}
+                className="flex-1 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 py-2.5 text-xs font-semibold text-cyan-200"
+              >
+                Next cue
+              </button>
+            </div>
+          </>
+        )}
 
         <p className="mt-3 text-[10px] text-zinc-600">
-          Pose detection ML can plug into this panel later. Today: accessible cues + optional
-          camera mirror.
+          {mode === 'live'
+            ? 'Frames are sent to Google Gemini for analysis and are not stored by IronLog.'
+            : 'Switch to Live Vision for Gemini movement detection and live form cues.'}
         </p>
       </div>
     </div>
