@@ -28,7 +28,7 @@ cp .env.example .env
 | `OPENAI_API_KEY` | `PRIVATE.env` | Athletyx backend only |
 | `GEMINI_API_KEY` | `PRIVATE.env` | Live Form Vision (Google AI Studio) |
 | `GEMINI_VISION_MODEL` | `PRIVATE.env` | Optional; default `gemini-2.0-flash` |
-| `FORM_VISION_RATE_LIMIT_PER_HOUR` | `PRIVATE.env` | Default 60 |
+| `FORM_VISION_RATE_LIMIT_PER_HOUR` | `PRIVATE.env` | Default 180 (motion gate is primary cost control) |
 | `SERPAPI_API_KEY` | `PRIVATE.env` | Athletyx backend only |
 | `SERPAPI_ENABLED` | `PRIVATE.env` | Set `true` to allow web search; default `false` |
 | `SUPABASE_URL` | `PRIVATE.env` | JWT validation on API |

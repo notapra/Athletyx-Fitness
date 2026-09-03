@@ -1,27 +1,31 @@
 /**
  * Form Vision panel — accessible opt-in form check during a set.
  * Cue mode (default for a11y) needs no camera; Camera is preview;
- * Live Vision samples frames and uses Gemini via Athletyx.
+ * Live Vision samples frames and uses Gemini via Athletyx (mobile-optimized).
  */
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { Camera, Eye, EyeOff, Loader2, Radio, X } from 'lucide-react'
 import {
   captureVideoFrames,
+  createMotionGate,
+  formatRelativeAge,
   getFormCuesForExercise,
   getFormVisionPreferences,
-  LIVE_VISION_FRAME_GAP_MS,
-  LIVE_VISION_INTERVAL_MS,
+  getLiveVisionCaptureProfile,
+  getNearbyExerciseCatalog,
+  LIVE_VISION_LOW_CONFIDENCE,
+  LIVE_VISION_STABLE_CONFIDENCE,
   markFormVisionOpened,
   requestCameraStream,
   stopMediaStream,
 } from '../../services/formVision.js'
 import { analyzeFormVision, getAthletyxHealth } from '../../services/athletyxService.js'
-import { EXERCISE_DATABASE } from '../../data/exercises.js'
-
-const CATALOG = EXERCISE_DATABASE.map((e) => e.name)
 
 /** @typedef {'cue' | 'camera' | 'live'} VisionMode */
+
+const FRAMING_HINT =
+  'Prop phone ~6–8 ft away, side or 45° view, full body in frame.'
 
 export default function FormVisionPanel({ exerciseName, onClose, onDetectedExercise }) {
   const titleId = useId()
@@ -33,9 +37,14 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
   const analysisGenRef = useRef(0)
   const inFlightRef = useRef(false)
   const priorDetectionRef = useRef(null)
+  const stableHitsRef = useRef(0)
+  const abortRef = useRef(null)
+  const motionGateRef = useRef(createMotionGate())
+  const lastAnalyzedAtRef = useRef(null)
 
   const cueSet = getFormCuesForExercise(exerciseName)
   const prefs = getFormVisionPreferences()
+  const profile = getLiveVisionCaptureProfile()
 
   const initialMode = (() => {
     if (prefs.preferCamera && prefs.liveVisionEnabled && prefs.cloudConsent) return 'live'
@@ -50,15 +59,29 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
   const [cameraReady, setCameraReady] = useState(false)
   const [geminiOk, setGeminiOk] = useState(null)
   const [analyzing, setAnalyzing] = useState(false)
+  const [idleSkip, setIdleSkip] = useState(false)
   const [liveError, setLiveError] = useState('')
   const [analysis, setAnalysis] = useState(null)
+  const [updatedAt, setUpdatedAt] = useState(null)
+  const [ageLabel, setAgeLabel] = useState(null)
 
   const useCamera = mode === 'camera' || mode === 'live'
   const activeCue = cueSet.cues[cueIndex] ?? cueSet.cues[0]
-  const liveCue =
-    analysis?.cues?.[0] ||
-    analysis?.summary ||
-    (analyzing ? 'Analyzing movement…' : 'Live Vision will describe your movement here.')
+
+  const lowConfidence =
+    analysis != null &&
+    typeof analysis.confidence === 'number' &&
+    analysis.confidence < LIVE_VISION_LOW_CONFIDENCE
+
+  const liveCue = lowConfidence
+    ? FRAMING_HINT
+    : analysis?.cues?.[0] ||
+      analysis?.summary ||
+      (analyzing
+        ? 'Analyzing movement…'
+        : idleSkip
+          ? 'Waiting for movement…'
+          : 'Live Vision will describe your movement here.')
 
   useEffect(() => {
     markFormVisionOpened()
@@ -67,6 +90,19 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
       setGeminiOk(Boolean(h.ok && (h.geminiAvailable || h.features?.includes('live_form_vision'))))
     })
   }, [])
+
+  useEffect(() => {
+    if (mode !== 'live' || updatedAt == null) {
+      setAgeLabel(null)
+      return undefined
+    }
+    function tickAge() {
+      setAgeLabel(formatRelativeAge(updatedAt))
+    }
+    tickAge()
+    const id = window.setInterval(tickAge, 1000)
+    return () => window.clearInterval(id)
+  }, [mode, updatedAt])
 
   useEffect(() => {
     function onKey(e) {
@@ -119,7 +155,7 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
     }
   }, [useCamera])
 
-  // Live Vision polling loop
+  // Live Vision polling loop — schedule from completion, motion gate, abort
   useEffect(() => {
     if (mode !== 'live' || !cameraReady) return undefined
     if (!prefs.cloudConsent) {
@@ -129,50 +165,103 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
 
     let cancelled = false
     let timerId = null
+    motionGateRef.current.reset()
+    stableHitsRef.current = 0
 
-    async function tick() {
+    function scheduleNext(ms) {
+      if (cancelled) return
+      timerId = window.setTimeout(runTick, ms)
+    }
+
+    function currentInterval(forceFast) {
+      const p = getLiveVisionCaptureProfile()
+      if (forceFast) return Math.min(800, p.baseIntervalMs)
+      if (stableHitsRef.current >= 2) return p.stableIntervalMs
+      return p.baseIntervalMs
+    }
+
+    async function runTick() {
       if (cancelled) return
       if (document.visibilityState === 'hidden') {
-        timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+        scheduleNext(currentInterval(false))
         return
       }
       if (inFlightRef.current) {
-        timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+        scheduleNext(currentInterval(false))
         return
       }
 
       const video = videoRef.current
       if (!video || video.readyState < 2) {
-        timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+        scheduleNext(currentInterval(false))
         return
       }
+
+      const gate = motionGateRef.current.sample(video)
+      if (gate.idle && lastAnalyzedAtRef.current != null) {
+        setIdleSkip(true)
+        setAnalyzing(false)
+        scheduleNext(currentInterval(false))
+        return
+      }
+      setIdleSkip(false)
 
       const gen = ++analysisGenRef.current
       inFlightRef.current = true
       setAnalyzing(true)
       setLiveError('')
 
+      if (abortRef.current) {
+        try {
+          abortRef.current.abort()
+        } catch {
+          /* ignore */
+        }
+      }
+      const controller = new AbortController()
+      abortRef.current = controller
+
+      const p = getLiveVisionCaptureProfile()
       try {
         const images = await captureVideoFrames(video, {
-          count: 2,
-          intervalMs: LIVE_VISION_FRAME_GAP_MS,
-          maxWidth: 640,
-          quality: 0.7,
+          count: p.frameCount,
+          intervalMs: p.frameGapMs,
+          maxWidth: p.maxWidth,
+          quality: p.quality,
         })
         if (cancelled || gen !== analysisGenRef.current) return
 
         const result = await analyzeFormVision({
           images,
           loggedExercise: exerciseName,
-          catalog: CATALOG,
+          catalog: getNearbyExerciseCatalog(exerciseName),
           priorDetection: priorDetectionRef.current || undefined,
+          signal: controller.signal,
         })
         if (cancelled || gen !== analysisGenRef.current) return
 
+        const prev = priorDetectionRef.current
         priorDetectionRef.current = result.detected_exercise
+        if (
+          result.confidence >= LIVE_VISION_STABLE_CONFIDENCE &&
+          prev &&
+          prev.toLowerCase() === String(result.detected_exercise || '').toLowerCase()
+        ) {
+          stableHitsRef.current += 1
+        } else if (result.confidence < LIVE_VISION_STABLE_CONFIDENCE) {
+          stableHitsRef.current = 0
+        } else if (!prev) {
+          stableHitsRef.current = 1
+        } else {
+          stableHitsRef.current = 1
+        }
+
+        lastAnalyzedAtRef.current = Date.now()
+        setUpdatedAt(lastAnalyzedAtRef.current)
         setAnalysis(result)
       } catch (err) {
         if (cancelled || gen !== analysisGenRef.current) return
+        if (err?.name === 'AbortError') return
         setLiveError(err?.message || 'Live Vision analysis failed.')
       } finally {
         if (gen === analysisGenRef.current) {
@@ -180,17 +269,24 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
           setAnalyzing(false)
         }
         if (!cancelled) {
-          timerId = window.setTimeout(tick, LIVE_VISION_INTERVAL_MS)
+          scheduleNext(currentInterval(false))
         }
       }
     }
 
-    timerId = window.setTimeout(tick, 600)
+    scheduleNext(600)
     return () => {
       cancelled = true
       analysisGenRef.current += 1
       inFlightRef.current = false
       if (timerId) window.clearTimeout(timerId)
+      if (abortRef.current) {
+        try {
+          abortRef.current.abort()
+        } catch {
+          /* ignore */
+        }
+      }
     }
   }, [mode, cameraReady, exerciseName, prefs.cloudConsent])
 
@@ -299,6 +395,15 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
           </button>
         </div>
 
+        {mode === 'live' ? (
+          <p
+            className="mb-3 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-[11px] text-zinc-400"
+            data-testid="form-vision-framing-hint"
+          >
+            {FRAMING_HINT}
+          </p>
+        ) : null}
+
         {useCamera ? (
           <div className="mb-3 overflow-hidden rounded-2xl border border-zinc-800 bg-black">
             <video
@@ -316,14 +421,23 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
                 <span className="inline-flex items-center gap-1.5">
                   {analyzing ? (
                     <Loader2 className="h-3 w-3 animate-spin text-cyan-400" aria-hidden />
+                  ) : idleSkip ? (
+                    <span className="h-2 w-2 rounded-full bg-zinc-500" aria-hidden />
                   ) : (
                     <span className="h-2 w-2 rounded-full bg-emerald-400" aria-hidden />
                   )}
-                  {analyzing ? 'Analyzing…' : 'Listening for movement'}
+                  {analyzing
+                    ? 'Analyzing…'
+                    : idleSkip
+                      ? 'Idle — skipping cloud call'
+                      : 'Listening for movement'}
                 </span>
-                {analysis?.confidence != null ? (
-                  <span>{Math.round(analysis.confidence * 100)}% confidence</span>
-                ) : null}
+                <span className="inline-flex items-center gap-2">
+                  {ageLabel ? <span data-testid="form-vision-freshness">{ageLabel}</span> : null}
+                  {analysis?.confidence != null ? (
+                    <span>{Math.round(analysis.confidence * 100)}%</span>
+                  ) : null}
+                </span>
               </div>
             ) : null}
           </div>
@@ -349,7 +463,7 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
           </p>
         ) : null}
 
-        {mismatch ? (
+        {mismatch && !lowConfidence ? (
           <div
             className="mb-3 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3"
             data-testid="form-vision-mismatch"
@@ -374,7 +488,7 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
 
         {mode === 'live' ? (
           <>
-            {analysis?.detected_exercise ? (
+            {analysis?.detected_exercise && !lowConfidence ? (
               <p
                 className="mb-2 text-xs text-zinc-400"
                 data-testid="form-vision-detected"
@@ -395,11 +509,11 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
               className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-zinc-100"
             >
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-400">
-                Live cue
+                {lowConfidence ? 'Framing' : 'Live cue'}
               </p>
               <p>{liveCue}</p>
             </div>
-            {analysis?.faults?.length ? (
+            {!lowConfidence && analysis?.faults?.length ? (
               <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-zinc-400">
                 {analysis.faults.slice(0, 4).map((f) => (
                   <li key={f}>{f}</li>
@@ -448,7 +562,7 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
 
         <p className="mt-3 text-[10px] text-zinc-600">
           {mode === 'live'
-            ? 'Frames are sent to Google Gemini for analysis and are not stored by IronLog.'
+            ? `Mobile-optimized: ~${Math.round(profile.baseIntervalMs / 1000)}s poll, idle skips, smaller frames. Not stored by IronLog.`
             : 'Switch to Live Vision for Gemini movement detection and live form cues.'}
         </p>
       </div>

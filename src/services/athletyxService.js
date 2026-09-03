@@ -104,13 +104,14 @@ export async function sendAthletyxCoachMessage(message, { profile, goals = [], a
 
 /**
  * Live Form Vision — send camera frames to Gemini via Athletyx.
- * @param {{ images: string[], loggedExercise?: string, catalog?: string[], priorDetection?: string }} opts
+ * @param {{ images: string[], loggedExercise?: string, catalog?: string[], priorDetection?: string, signal?: AbortSignal }} opts
  */
 export async function analyzeFormVision({
   images,
   loggedExercise,
   catalog = [],
   priorDetection,
+  signal,
 }) {
   const url = getAthletyxApiPath('form-vision')
   const token = await getAccessToken()
@@ -126,6 +127,7 @@ export async function analyzeFormVision({
       catalog,
       prior_detection: priorDetection || null,
     }),
+    signal,
   })
 
   if (!response.ok) {

@@ -75,13 +75,18 @@ def _build_prompt(
     catalog: list[str],
     prior_detection: str | None,
 ) -> str:
-    catalog_preview = ", ".join(catalog[:80]) if catalog else "(none provided)"
+    catalog_preview = ", ".join(catalog[:40]) if catalog else "(none provided)"
     logged = logged_exercise or "(not provided)"
     prior = prior_detection or "(none)"
-    return f"""You are IronLog Live Vision, a strength-training form coach analyzing camera frames of a lifter.
+    return f"""You are IronLog Live Vision, a strength-training form coach analyzing phone camera frames from a gym.
+
+Phone / framing context:
+- Footage is often from a propped phone: prefer full-body, side or ~45° views.
+- If the lifter is tiny, heavily cropped, motion-blurred, or barely visible, set confidence below 0.45 and put a short framing cue first (e.g. "Step back — full body in frame" or "Film from the side").
+- Cues must be short glanceable phrases (≤12 words each), max 3.
 
 Tasks:
-1. Identify the PRIMARY strength movement being performed from body position and equipment.
+1. Identify the PRIMARY strength movement from body position and equipment.
 2. Prefer a name from the exercise catalog when it clearly matches. If none fit, use a clear common name.
 3. The logged exercise is a HINT ONLY — do NOT force-match it. Detect what is actually happening.
 4. Critique form briefly: concrete faults and 1–3 actionable coaching cues.
@@ -182,6 +187,8 @@ def analyze_form_vision(
     confidence = max(0.0, min(1.0, confidence))
     faults = [str(f).strip() for f in (data.get("faults") or []) if str(f).strip()][:6]
     cues = [str(c).strip() for c in (data.get("cues") or []) if str(c).strip()][:3]
+    # Keep cues glanceable on phone
+    cues = [c if len(c) <= 80 else c[:77] + "…" for c in cues]
     summary = str(data.get("summary") or "").strip()[:400]
     form_score = str(data.get("form_score") or "unknown")
 

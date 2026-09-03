@@ -18,7 +18,7 @@ _jwks_cache: dict[str, Any] | None = None
 _rate_buckets: dict[str, list[float]] = defaultdict(list)
 _form_vision_buckets: dict[str, list[float]] = defaultdict(list)
 RATE_LIMIT = int(os.getenv("COACH_RATE_LIMIT_PER_HOUR", "30"))
-FORM_VISION_RATE_LIMIT = int(os.getenv("FORM_VISION_RATE_LIMIT_PER_HOUR", "60"))
+FORM_VISION_RATE_LIMIT = int(os.getenv("FORM_VISION_RATE_LIMIT_PER_HOUR", "180"))
 RATE_WINDOW = 3600
 
 
