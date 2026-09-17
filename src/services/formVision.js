@@ -11,10 +11,10 @@ import { listSupportedFormExercises, resolveFormCueSet } from '../utils/formCues
 const STORAGE_KEY = 'ironlog_form_vision_prefs_v1'
 
 const DEFAULT_PREFS = {
-  enabled: false,
+  enabled: true,
   preferCamera: true,
   liveVisionEnabled: true,
-  cloudConsent: false,
+  cloudConsent: true,
   lastOpenedAt: null,
 }
 
@@ -74,8 +74,35 @@ export function setFormVisionCloudConsent(cloudConsent) {
   return prefs
 }
 
-export function markFormVisionOpened() {
+/**
+ * Auto-enable Form Vision + Live Vision + cloud consent for workout Live Vision.
+ * Idempotent; persists so Settings reflects the same state.
+ */
+export function ensureLiveVisionPrefs() {
   const prefs = readPrefs()
+  let changed = false
+  if (!prefs.enabled) {
+    prefs.enabled = true
+    changed = true
+  }
+  if (!prefs.preferCamera) {
+    prefs.preferCamera = true
+    changed = true
+  }
+  if (!prefs.liveVisionEnabled) {
+    prefs.liveVisionEnabled = true
+    changed = true
+  }
+  if (!prefs.cloudConsent) {
+    prefs.cloudConsent = true
+    changed = true
+  }
+  if (changed) writePrefs(prefs)
+  return prefs
+}
+
+export function markFormVisionOpened() {
+  const prefs = ensureLiveVisionPrefs()
   prefs.lastOpenedAt = new Date().toISOString()
   writePrefs(prefs)
   return prefs

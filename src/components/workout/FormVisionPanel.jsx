@@ -9,18 +9,18 @@ import { Camera, Eye, EyeOff, Loader2, Radio, X } from 'lucide-react'
 import {
   captureVideoFrames,
   createMotionGate,
+  ensureLiveVisionPrefs,
   formatRelativeAge,
   getFormCuesForExercise,
-  getFormVisionPreferences,
   getLiveVisionCaptureProfile,
   getNearbyExerciseCatalog,
   LIVE_VISION_LOW_CONFIDENCE,
-  LIVE_VISION_STABLE_CONFIDENCE,
   markFormVisionOpened,
   requestCameraStream,
   stopMediaStream,
 } from '../../services/formVision.js'
 import { analyzeFormVision, getAthletyxHealth } from '../../services/athletyxService.js'
+import { GeminiLiveClient } from '../../services/geminiLiveClient.js'
 
 /** @typedef {'cue' | 'camera' | 'live'} VisionMode */
 
@@ -34,23 +34,15 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
   const closeRef = useRef(null)
   const videoRef = useRef(null)
   const streamRef = useRef(null)
-  const analysisGenRef = useRef(0)
-  const inFlightRef = useRef(false)
   const priorDetectionRef = useRef(null)
-  const stableHitsRef = useRef(0)
-  const abortRef = useRef(null)
   const motionGateRef = useRef(createMotionGate())
   const lastAnalyzedAtRef = useRef(null)
+  const liveClientRef = useRef(null)
 
   const cueSet = getFormCuesForExercise(exerciseName)
-  const prefs = getFormVisionPreferences()
-  const profile = getLiveVisionCaptureProfile()
+  const prefs = ensureLiveVisionPrefs()
 
-  const initialMode = (() => {
-    if (prefs.preferCamera && prefs.liveVisionEnabled && prefs.cloudConsent) return 'live'
-    if (prefs.preferCamera) return 'camera'
-    return 'cue'
-  })()
+  const initialMode = 'live'
 
   /** @type {[VisionMode, function]} */
   const [mode, setMode] = useState(initialMode)
@@ -65,6 +57,9 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
   const [updatedAt, setUpdatedAt] = useState(null)
   const [ageLabel, setAgeLabel] = useState(null)
 
+  const [streamStats, setStreamStats] = useState(null)
+  const [transport, setTransport] = useState('ws') // ws | rest
+
   const useCamera = mode === 'camera' || mode === 'live'
   const activeCue = cueSet.cues[cueIndex] ?? cueSet.cues[0]
 
@@ -73,21 +68,13 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
     typeof analysis.confidence === 'number' &&
     analysis.confidence < LIVE_VISION_LOW_CONFIDENCE
 
-  const liveCue = lowConfidence
-    ? FRAMING_HINT
-    : analysis?.cues?.[0] ||
-      analysis?.summary ||
-      (analyzing
-        ? 'Analyzing movement…'
-        : idleSkip
-          ? 'Waiting for movement…'
-          : 'Live Vision will describe your movement here.')
-
   useEffect(() => {
+    ensureLiveVisionPrefs()
     markFormVisionOpened()
     closeRef.current?.focus()
     getAthletyxHealth().then((h) => {
-      setGeminiOk(Boolean(h.ok && (h.geminiAvailable || h.features?.includes('live_form_vision'))))
+      const ok = Boolean(h.ok && (h.geminiAvailable || h.features?.includes('live_form_vision')))
+      setGeminiOk(ok)
     })
   }, [])
 
@@ -155,150 +142,231 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
     }
   }, [useCamera])
 
-  // Live Vision polling loop — schedule from completion, motion gate, abort
+  // Gemini Live WebSocket pipeline (primary); REST poll fallback
   useEffect(() => {
     if (mode !== 'live' || !cameraReady) return undefined
-    if (!prefs.cloudConsent) {
-      setLiveError('Enable cloud analysis consent in Settings to use Live Vision.')
-      return undefined
-    }
+    ensureLiveVisionPrefs()
 
     let cancelled = false
     let timerId = null
+    let pingId = null
+    let usingRest = false
     motionGateRef.current.reset()
-    stableHitsRef.current = 0
 
-    function scheduleNext(ms) {
-      if (cancelled) return
-      timerId = window.setTimeout(runTick, ms)
+    const client = new GeminiLiveClient({
+      onOpen: () => {
+        if (cancelled) return
+        setTransport('ws')
+        setLiveError('')
+      },
+      onError: (err) => {
+        if (cancelled) return
+        setLiveError(err?.message || 'Live WebSocket error')
+      },
+      onClose: () => {
+        if (cancelled || usingRest) return
+        // Fall back to REST snapshot loop if WS drops before useful data
+        if (!lastAnalyzedAtRef.current) {
+          usingRest = true
+          setTransport('rest')
+          setLiveError('Live WS unavailable — falling back to REST snapshots.')
+          scheduleRest(800)
+        }
+      },
+      onMessage: (msg) => {
+        if (cancelled) return
+        if (msg.type === 'error') {
+          setLiveError(msg.message || 'Live gateway error')
+          if (msg.retryable === false && !lastAnalyzedAtRef.current) {
+            usingRest = true
+            setTransport('rest')
+            scheduleRest(800)
+          }
+          return
+        }
+        if (msg.type === 'reconnecting') {
+          setLiveError(`Reconnecting to Gemini Live (attempt ${msg.attempt})…`)
+          return
+        }
+        if (msg.type === 'ready') {
+          setLiveError('')
+          setAnalyzing(true)
+          return
+        }
+        if (msg.type === 'model_text' && msg.text) {
+          setAnalysis((prev) => ({
+            detected_exercise: prev?.detected_exercise || priorDetectionRef.current || '…',
+            confidence: prev?.confidence ?? 0,
+            matches_logged: prev?.matches_logged ?? false,
+            form_score: prev?.form_score || 'unknown',
+            faults: prev?.faults || [],
+            cues: prev?.cues || [],
+            summary: msg.text,
+            powered_by: prev?.powered_by || 'Gemini Live',
+          }))
+          lastAnalyzedAtRef.current = Date.now()
+          setUpdatedAt(lastAnalyzedAtRef.current)
+          setAnalyzing(false)
+          return
+        }
+        if (msg.type === 'tool_call' && msg.name === 'report_detected_exercise') {
+          const args = msg.args || {}
+          const detected = String(args.detected_exercise || 'Unknown')
+          priorDetectionRef.current = detected
+          const result = {
+            detected_exercise: detected,
+            confidence: Number(args.confidence) || 0,
+            matches_logged: Boolean(
+              exerciseName &&
+                detected.toLowerCase().includes(String(exerciseName).toLowerCase().slice(0, 4))
+            ),
+            form_score: args.form_score || 'unknown',
+            faults: Array.isArray(args.faults) ? args.faults : [],
+            cues: Array.isArray(args.cues) ? args.cues : [],
+            summary: args.summary || detected,
+            powered_by: 'Gemini Live (tool)',
+          }
+          setAnalysis(result)
+          lastAnalyzedAtRef.current = Date.now()
+          setUpdatedAt(lastAnalyzedAtRef.current)
+          setAnalyzing(false)
+          setLiveError('')
+          return
+        }
+        if (msg.type === 'stats') {
+          setStreamStats(msg)
+        }
+        if (msg.type === 'go_away') {
+          setLiveError('Gemini Live GoAway — session ending; will reconnect if possible.')
+        }
+      },
+    })
+    liveClientRef.current = client
+
+    try {
+      client.start({
+        loggedExercise: exerciseName,
+        catalog: getNearbyExerciseCatalog(exerciseName),
+      })
+    } catch (err) {
+      usingRest = true
+      setTransport('rest')
+      setLiveError(err?.message || 'Could not start Live WS')
+      scheduleRest(800)
     }
 
-    function currentInterval(forceFast) {
-      const p = getLiveVisionCaptureProfile()
-      if (forceFast) return Math.min(800, p.baseIntervalMs)
-      if (stableHitsRef.current >= 2) return p.stableIntervalMs
-      return p.baseIntervalMs
+    function scheduleRest(ms) {
+      if (cancelled) return
+      timerId = window.setTimeout(runRestTick, ms)
     }
 
-    async function runTick() {
-      if (cancelled) return
+    async function runRestTick() {
+      if (cancelled || !usingRest) return
       if (document.visibilityState === 'hidden') {
-        scheduleNext(currentInterval(false))
+        scheduleRest(2500)
         return
       }
-      if (inFlightRef.current) {
-        scheduleNext(currentInterval(false))
-        return
-      }
-
       const video = videoRef.current
       if (!video || video.readyState < 2) {
-        scheduleNext(currentInterval(false))
+        scheduleRest(1500)
         return
       }
-
       const gate = motionGateRef.current.sample(video)
       if (gate.idle && lastAnalyzedAtRef.current != null) {
         setIdleSkip(true)
-        setAnalyzing(false)
-        scheduleNext(currentInterval(false))
+        scheduleRest(2500)
         return
       }
       setIdleSkip(false)
-
-      const gen = ++analysisGenRef.current
-      inFlightRef.current = true
       setAnalyzing(true)
-      setLiveError('')
-
-      if (abortRef.current) {
-        try {
-          abortRef.current.abort()
-        } catch {
-          /* ignore */
-        }
-      }
-      const controller = new AbortController()
-      abortRef.current = controller
-
-      const p = getLiveVisionCaptureProfile()
       try {
+        const p = getLiveVisionCaptureProfile()
         const images = await captureVideoFrames(video, {
-          count: p.frameCount,
-          intervalMs: p.frameGapMs,
+          count: 1,
+          intervalMs: 0,
           maxWidth: p.maxWidth,
           quality: p.quality,
         })
-        if (cancelled || gen !== analysisGenRef.current) return
-
+        if (cancelled) return
         const result = await analyzeFormVision({
           images,
           loggedExercise: exerciseName,
           catalog: getNearbyExerciseCatalog(exerciseName),
           priorDetection: priorDetectionRef.current || undefined,
-          signal: controller.signal,
         })
-        if (cancelled || gen !== analysisGenRef.current) return
-
-        const prev = priorDetectionRef.current
+        if (cancelled) return
         priorDetectionRef.current = result.detected_exercise
-        if (
-          result.confidence >= LIVE_VISION_STABLE_CONFIDENCE &&
-          prev &&
-          prev.toLowerCase() === String(result.detected_exercise || '').toLowerCase()
-        ) {
-          stableHitsRef.current += 1
-        } else if (result.confidence < LIVE_VISION_STABLE_CONFIDENCE) {
-          stableHitsRef.current = 0
-        } else if (!prev) {
-          stableHitsRef.current = 1
-        } else {
-          stableHitsRef.current = 1
-        }
-
+        setAnalysis(result)
         lastAnalyzedAtRef.current = Date.now()
         setUpdatedAt(lastAnalyzedAtRef.current)
-        setAnalysis(result)
+        setLiveError('')
       } catch (err) {
-        if (cancelled || gen !== analysisGenRef.current) return
-        if (err?.name === 'AbortError') return
-        setLiveError(err?.message || 'Live Vision analysis failed.')
+        if (!cancelled) setLiveError(err?.message || 'REST vision failed')
       } finally {
-        if (gen === analysisGenRef.current) {
-          inFlightRef.current = false
-          setAnalyzing(false)
-        }
         if (!cancelled) {
-          scheduleNext(currentInterval(false))
+          setAnalyzing(false)
+          scheduleRest(2500)
         }
       }
     }
 
-    scheduleNext(600)
+    function frameTick() {
+      if (cancelled || usingRest) return
+      if (document.visibilityState === 'hidden') {
+        timerId = window.setTimeout(frameTick, 1000)
+        return
+      }
+      const video = videoRef.current
+      if (!video || video.readyState < 2) {
+        timerId = window.setTimeout(frameTick, 500)
+        return
+      }
+      const gate = motionGateRef.current.sample(video)
+      if (gate.idle && lastAnalyzedAtRef.current != null) {
+        setIdleSkip(true)
+        timerId = window.setTimeout(frameTick, 1000)
+        return
+      }
+      setIdleSkip(false)
+      setAnalyzing(true)
+      try {
+        const result = client.sendVideoFrame(video, { maxWidth: 720, quality: 0.75 })
+        if (result.sent) {
+          setStreamStats({
+            framesAccepted: client.stats.framesSent,
+            lastFrameBytes: result.bytesApprox,
+            dropped: false,
+          })
+        }
+      } catch (err) {
+        setLiveError(err?.message || 'Frame send failed')
+      }
+      timerId = window.setTimeout(frameTick, 1000)
+    }
+
+    timerId = window.setTimeout(frameTick, 700)
+    pingId = window.setInterval(() => {
+      try {
+        if (!usingRest) client.ping()
+      } catch {
+        /* ignore */
+      }
+    }, 20000)
+
     return () => {
       cancelled = true
-      analysisGenRef.current += 1
-      inFlightRef.current = false
       if (timerId) window.clearTimeout(timerId)
-      if (abortRef.current) {
-        try {
-          abortRef.current.abort()
-        } catch {
-          /* ignore */
-        }
-      }
+      if (pingId) window.clearInterval(pingId)
+      client.stop()
+      liveClientRef.current = null
     }
   }, [mode, cameraReady, exerciseName, prefs.cloudConsent])
 
   function selectMode(next) {
     if (next === 'live') {
-      if (!prefs.cloudConsent) {
-        setLiveError('Enable cloud analysis consent in Settings first.')
-        setMode('camera')
-        return
-      }
+      ensureLiveVisionPrefs()
       if (geminiOk === false) {
-        setLiveError('Live Vision API unavailable — set GEMINI_API_KEY on the Athletyx server.')
+        setLiveError('Live Vision API unavailable — start Athletyx API with GEMINI_API_KEY set.')
       }
     }
     setLiveError('')
@@ -331,11 +399,11 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
             <h2 id={titleId} className="text-base font-semibold text-white">
-              Form check — {cueSet.title}
+              Live Vision — motion detect
             </h2>
             <p id={descId} className="mt-1 text-xs text-zinc-500">
-              Opt-in coaching. Live Vision detects your movement with Gemini. Not medical advice —
-              stop if you feel sharp pain.
+              Gemini assumes the movement from your camera and streams raw analysis. Cloud
+              consent is auto-enabled for Live Vision. Not medical advice.
             </p>
           </div>
           <button
@@ -433,6 +501,12 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
                       : 'Listening for movement'}
                 </span>
                 <span className="inline-flex items-center gap-2">
+                  <span className="uppercase tracking-wide text-zinc-500">
+                    {transport === 'ws' ? 'ws' : 'rest'}
+                  </span>
+                  {streamStats?.lastFrameBytes ? (
+                    <span>{Math.round(streamStats.lastFrameBytes / 1024)}KB</span>
+                  ) : null}
                   {ageLabel ? <span data-testid="form-vision-freshness">{ageLabel}</span> : null}
                   {analysis?.confidence != null ? (
                     <span>{Math.round(analysis.confidence * 100)}%</span>
@@ -488,38 +562,99 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
 
         {mode === 'live' ? (
           <>
-            {analysis?.detected_exercise && !lowConfidence ? (
-              <p
-                className="mb-2 text-xs text-zinc-400"
-                data-testid="form-vision-detected"
-              >
-                Detected:{' '}
-                <span className="font-semibold text-cyan-200">{analysis.detected_exercise}</span>
-                {analysis.form_score && analysis.form_score !== 'unknown' ? (
-                  <span className="text-zinc-500"> · form {analysis.form_score.replace('_', ' ')}</span>
-                ) : null}
-              </p>
-            ) : null}
             <div
               id={liveId}
               role="status"
               aria-live="polite"
               aria-atomic="true"
               data-testid="form-vision-live-cue"
-              className="rounded-2xl border border-cyan-500/20 bg-cyan-500/5 p-4 text-sm text-zinc-100"
+              className="mb-3 rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4"
             >
               <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-cyan-400">
-                {lowConfidence ? 'Framing' : 'Live cue'}
+                Assumed workout right now
               </p>
-              <p>{liveCue}</p>
+              <p className="text-xl font-bold text-white" data-testid="form-vision-detected">
+                {analyzing && !analysis
+                  ? 'Analyzing…'
+                  : analysis?.detected_exercise ||
+                    (idleSkip ? 'Waiting for movement…' : '—')}
+              </p>
+              {analysis?.summary ? (
+                <p className="mt-1 text-sm text-zinc-300">{analysis.summary}</p>
+              ) : null}
+              {lowConfidence ? (
+                <p className="mt-2 text-xs text-amber-300">{FRAMING_HINT}</p>
+              ) : null}
             </div>
-            {!lowConfidence && analysis?.faults?.length ? (
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-zinc-400">
-                {analysis.faults.slice(0, 4).map((f) => (
-                  <li key={f}>{f}</li>
-                ))}
-              </ul>
-            ) : null}
+
+            <div
+              className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3"
+              data-testid="form-vision-raw-analysis"
+            >
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                Raw Gemini analysis
+              </p>
+              {analysis ? (
+                <dl className="space-y-2 text-xs text-zinc-300">
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-zinc-500">detected_exercise</dt>
+                    <dd className="font-mono text-cyan-200">{analysis.detected_exercise}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-zinc-500">confidence</dt>
+                    <dd className="font-mono">
+                      {typeof analysis.confidence === 'number'
+                        ? analysis.confidence.toFixed(3)
+                        : '—'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-zinc-500">matches_logged</dt>
+                    <dd className="font-mono">{String(analysis.matches_logged)}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-zinc-500">form_score</dt>
+                    <dd className="font-mono">{analysis.form_score ?? '—'}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">faults</dt>
+                    <dd className="mt-1 font-mono text-[11px] text-zinc-400">
+                      {analysis.faults?.length
+                        ? JSON.stringify(analysis.faults, null, 2)
+                        : '[]'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">cues</dt>
+                    <dd className="mt-1 font-mono text-[11px] text-zinc-400">
+                      {analysis.cues?.length
+                        ? JSON.stringify(analysis.cues, null, 2)
+                        : '[]'}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-zinc-500">summary</dt>
+                    <dd className="mt-1 font-mono text-[11px] text-zinc-400">
+                      {analysis.summary || '—'}
+                    </dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-zinc-500">powered_by</dt>
+                    <dd className="font-mono text-[11px]">{analysis.powered_by || '—'}</dd>
+                  </div>
+                  <div className="flex justify-between gap-3">
+                    <dt className="text-zinc-500">logged_exercise</dt>
+                    <dd className="font-mono text-[11px]">{exerciseName || '—'}</dd>
+                  </div>
+                </dl>
+              ) : (
+                <p className="text-xs text-zinc-500">
+                  {analyzing
+                    ? 'Waiting for first Gemini response…'
+                    : 'No analysis yet — move in frame.'}
+                </p>
+              )}
+            </div>
           </>
         ) : (
           <>
@@ -562,8 +697,8 @@ export default function FormVisionPanel({ exerciseName, onClose, onDetectedExerc
 
         <p className="mt-3 text-[10px] text-zinc-600">
           {mode === 'live'
-            ? `Mobile-optimized: ~${Math.round(profile.baseIntervalMs / 1000)}s poll, idle skips, smaller frames. Not stored by IronLog.`
-            : 'Switch to Live Vision for Gemini movement detection and live form cues.'}
+            ? 'Now: raw detection feed. Coach-style live cues are Stage 11 (future).'
+            : 'Switch to Live Vision for Gemini movement detection.'}
         </p>
       </div>
     </div>

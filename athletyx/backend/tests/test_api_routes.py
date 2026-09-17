@@ -177,3 +177,6 @@ def test_health_includes_gemini_flag(client, monkeypatch):
     data = res.json()
     assert data.get("gemini_available") is True
     assert "live_form_vision" in data["features"]
+    assert data.get("gemini_live_available") is True
+    assert "gemini_live_ws" in data["features"]
+    assert data.get("gemini_live_model")

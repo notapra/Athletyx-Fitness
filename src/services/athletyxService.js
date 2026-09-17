@@ -39,6 +39,7 @@ export async function getAthletyxHealth() {
       webSearchAvailable: data?.web_search_available === true,
       openaiAvailable: data?.openai_available === true,
       geminiAvailable: data?.gemini_available === true,
+      geminiLiveAvailable: data?.gemini_live_available === true,
       features: data?.features ?? [],
     }
   } catch {
@@ -47,6 +48,7 @@ export async function getAthletyxHealth() {
       webSearchAvailable: false,
       openaiAvailable: false,
       geminiAvailable: false,
+      geminiLiveAvailable: false,
       features: [],
     }
   }

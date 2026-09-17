@@ -13,7 +13,8 @@ Shipped feature plans (completed work) live here in git. **Future / backlog plan
 | **07** | [Ship and operate](./07-ship-and-operate.plan.md) | Completed (code) | CI gates, built-in nutrition, ops runbooks; cloud staging = operator |
 | **08** | [Health platform integration](./08-health-platform-integration.plan.md) | Completed | HealthKit / Health Connect sync, Settings UI, Capacitor plugin |
 | **09** | [Production cutover](./09-production-cutover.plan.md) | Ready to merge | Release PR #2 to main; CI green; operator cloud promote |
-| **10** | [Form Vision opt-in](./10-form-vision-opt-in.plan.md) | In progress | Accessible form check: Settings toggle, cue mode, optional camera |
+| **10** | [Form Vision opt-in](./10-form-vision-opt-in.plan.md) | Completed (base) | Accessible form check: Settings toggle, cue mode, optional camera |
+| **11** | [Live Vision coach feedback](./11-live-vision-coach-feedback.plan.md) | Future | Coach-like live cues on top of raw Gemini motion detection |
 
 ## Future notes (local only)
 

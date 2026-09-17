@@ -10,6 +10,7 @@ export default defineConfig({
       '/api/athletyx': {
         target: 'http://127.0.0.1:8000',
         changeOrigin: true,
+        ws: true,
         rewrite: (path) => {
           if (path === '/api/athletyx/health') return '/health'
           return path.replace(/^\/api\/athletyx/, '/api')

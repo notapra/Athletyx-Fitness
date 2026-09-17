@@ -471,8 +471,8 @@ export default function Settings({ onBack }) {
               <span className="text-sm text-zinc-300">
                 Cloud analysis consent
                 <span className="mt-1 block text-[10px] text-zinc-500">
-                  Frames are sent to Google Gemini for movement and form analysis; they are not
-                  stored by IronLog.
+                  Auto-enabled when you open Live Vision in a workout. Frames go to Google Gemini
+                  for movement detection; IronLog does not store them. You can turn this off here.
                 </span>
               </span>
               <input

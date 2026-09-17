@@ -12,7 +12,7 @@ import {
   loadActiveSession,
   saveActiveSession,
 } from '../utils/storage.js'
-import { migrateLegacyWorkout, createId, sessionHasValidSets } from '../utils/session.js'
+import { migrateLegacyWorkout, createId, sessionHasValidSets, createEmptyExercise } from '../utils/session.js'
 import { normalizeSessions } from '../utils/calculations.js'
 import { buildGoalContract } from '../utils/goalContract.js'
 import { maybePostWorkoutReminder } from '../services/guardianService.js'
@@ -177,7 +177,8 @@ export function AppProvider({ children }) {
       notes: '',
       date: new Date().toISOString(),
       startedAt: Date.now(),
-      exercises: [],
+      // Seed one empty block so Form Vision / set logging are available immediately
+      exercises: [createEmptyExercise('')],
     }
     setActiveSession(session)
     setWorkoutMode(true)

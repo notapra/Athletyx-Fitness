@@ -27,11 +27,13 @@ from backend.mcp_auth import build_mcp_session_payload
 from backend.nutrition_service import fetch_food_detail, search_foods
 from backend.query_cache import get_cache_stats
 from backend.form_vision_service import analyze_form_vision, gemini_available
+from backend.gemini_live_client import gemini_live_available, gemini_live_model
+from backend.live_vision_ws import router as live_vision_ws_router
 
 load_dotenv()
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", "PRIVATE.env"))
 
-app = FastAPI(title="Athletyx API", version="0.3.0")
+app = FastAPI(title="Athletyx API", version="0.4.0")
 
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
@@ -41,6 +43,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(live_vision_ws_router)
 
 
 class ChatRequest(BaseModel):
@@ -134,6 +137,8 @@ def health():
         features.append("usda_fdc")
     if gemini_available():
         features.append("live_form_vision")
+    if gemini_live_available():
+        features.append("gemini_live_ws")
     return {
         "status": "ok",
         "service": "athletyx",
@@ -142,6 +147,8 @@ def health():
         "web_search_available": serpapi_available(),
         "openai_available": bool(os.getenv("OPENAI_API_KEY", "").strip()),
         "gemini_available": gemini_available(),
+        "gemini_live_available": gemini_live_available(),
+        "gemini_live_model": gemini_live_model() if gemini_live_available() else None,
         "cache": get_cache_stats(),
     }
 

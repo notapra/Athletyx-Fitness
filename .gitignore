@@ -27,6 +27,9 @@ docs/plans/future/
 .tools/
 PRIVATE.env
 PRIVATE.env.staging
+PRIVATE.SECRETS.md
+PRIVATE.SECRETS.*.md
+*.SECRETS.local.md
 athletyx.mcp/.env
 **/uploads/*.json
 

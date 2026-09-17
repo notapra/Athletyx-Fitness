@@ -22,7 +22,7 @@ import { useWorkoutTimer } from '../../hooks/useWorkoutTimer.js'
 import { hapticLight, hapticSuccess } from '../../utils/haptics.js'
 import RestTimer from './RestTimer.jsx'
 import FormVisionPanel from './FormVisionPanel.jsx'
-import { getFormVisionPreferences } from '../../services/formVision.js'
+import { getFormVisionPreferences, ensureLiveVisionPrefs } from '../../services/formVision.js'
 
 export default function ActiveWorkout({
   session,
@@ -94,6 +94,28 @@ export default function ActiveWorkout({
     const block = session.exercises[exIdx]
     const sets = block.sets.filter((_, i) => i !== setIdx)
     updateExercise(exIdx, { ...block, sets: sets.length ? sets : [createEmptySet()] })
+  }
+
+  function openFormVision(exIdx = expandedIdx) {
+    ensureLiveVisionPrefs()
+    const exercises = session.exercises ?? []
+    let idx = exIdx
+    let nextExercises = exercises
+    if (!exercises.length) {
+      nextExercises = [createEmptyExercise('')]
+      updateSession({ exercises: nextExercises, split, notes })
+      idx = 0
+      setExpandedIdx(0)
+    } else if (idx == null || idx < 0 || idx >= exercises.length) {
+      idx = 0
+      setExpandedIdx(0)
+    } else {
+      setExpandedIdx(idx)
+    }
+    const block = nextExercises[idx]
+    const name = block?.exercise || 'Exercise'
+    setFormVisionExIdx(idx)
+    setFormVisionExercise(name)
   }
 
   function handleFinish() {
@@ -271,10 +293,7 @@ export default function ActiveWorkout({
                         <button
                           type="button"
                           data-testid="form-vision-open"
-                          onClick={() => {
-                            setFormVisionExercise(block.exercise || 'Exercise')
-                            setFormVisionExIdx(exIdx)
-                          }}
+                          onClick={() => openFormVision(exIdx)}
                           className="flex items-center justify-center gap-1 rounded-2xl border border-cyan-500/30 px-3 py-2.5 text-xs font-semibold text-cyan-300"
                           aria-label={`Open form check for ${block.exercise || 'exercise'}`}
                         >
@@ -334,15 +353,31 @@ export default function ActiveWorkout({
         />
       </div>
 
-      <motion.button
-        type="button"
-        data-testid="add-exercise-fab"
-        whileTap={{ scale: 0.95 }}
-        onClick={() => setShowExercisePicker(true)}
-        className="safe-bottom fixed bottom-6 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 text-zinc-950 shadow-2xl shadow-emerald-500/30"
-      >
-        <Plus className="h-7 w-7" strokeWidth={2.5} />
-      </motion.button>
+      <div className="safe-bottom fixed bottom-6 right-4 z-50 flex flex-col items-end gap-3">
+        <motion.button
+          type="button"
+          data-testid="form-vision-fab"
+          whileTap={{ scale: 0.95 }}
+          onClick={() => openFormVision(expandedIdx)}
+          className="flex h-14 w-14 items-center justify-center rounded-full border border-cyan-400/50 bg-zinc-900 text-cyan-300 shadow-2xl shadow-cyan-500/20"
+          aria-label="Open Live Form Vision"
+          title="Form Vision"
+        >
+          <Scan className="h-6 w-6" strokeWidth={2.5} />
+        </motion.button>
+        <motion.button
+          type="button"
+          data-testid="add-exercise-fab"
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            setShowExercisePicker(true)
+          }}
+          className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 text-zinc-950 shadow-2xl shadow-emerald-500/30"
+          aria-label="Add exercise"
+        >
+          <Plus className="h-7 w-7" strokeWidth={2.5} />
+        </motion.button>
+      </div>
 
       <RestTimer timer={restTimer} />
 
