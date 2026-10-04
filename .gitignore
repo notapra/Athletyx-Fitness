@@ -10,11 +10,25 @@ lerna-debug.log*
 node_modules
 dist
 dist-ssr
+test-results
+playwright-report
+blob-report
 *.local
 .env
 .env.*
 !.env.example
+!.env.staging.example
 !.env.local.example
+
+# Local / future planning (gitignored)
+
+docs/plans/future/
+.cursor/plans/
+.tools/
+PRIVATE.env
+PRIVATE.env.staging
+athletyx.mcp/.env
+**/uploads/*.json
 
 # Editor directories and files
 .vscode/*

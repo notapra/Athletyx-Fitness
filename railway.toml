@@ -1,0 +1,10 @@
+# Railway deploy — Athletyx Coach API (build from repo root)
+
+[build]
+builder = "DOCKERFILE"
+dockerfilePath = "athletyx/Dockerfile"
+
+[deploy]
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"

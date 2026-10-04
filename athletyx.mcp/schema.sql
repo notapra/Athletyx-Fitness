@@ -16,6 +16,15 @@ ALTER TABLE users ADD COLUMN IF NOT EXISTS bodyweight NUMERIC;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS ai_enabled BOOLEAN DEFAULT true;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS notification_preferences JSONB DEFAULT '{}'::jsonb;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS constraints JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS age INTEGER;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS personal_factors JSONB DEFAULT '{
+  "max_effort_level": "moderate",
+  "injury_history": [],
+  "movement_restrictions": [],
+  "recovery_capacity": "average",
+  "medical_clearance": true,
+  "notes": ""
+}'::jsonb;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ DEFAULT now();
 ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
 
@@ -90,14 +99,55 @@ CREATE TABLE IF NOT EXISTS audit_log (
 
 CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log (user_id, created_at DESC);
 
+-- Phase 2 tables (chat, guardian, account deletion)
+CREATE TABLE IF NOT EXISTS ai_chat_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
+    message TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_ai_chat_user ON ai_chat_history (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS guardian_checks (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    check_type VARCHAR(40) NOT NULL,
+    drift_score INTEGER DEFAULT 0,
+    aligned BOOLEAN DEFAULT true,
+    coach_excerpt TEXT,
+    payload JSONB DEFAULT '{}'::jsonb,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_guardian_checks_user ON guardian_checks (user_id, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS account_deletion_requests (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    requested_at TIMESTAMPTZ DEFAULT now(),
+    scheduled_purge_at TIMESTAMPTZ DEFAULT (now() + interval '30 days'),
+    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'cancelled', 'completed'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_users_fitness_goal ON users (fitness_goal);
 CREATE INDEX IF NOT EXISTS idx_users_experience_level ON users (experience_level);
 
-INSERT INTO users (name, email, fitness_goal, experience_level, units, bodyweight)
+INSERT INTO users (name, email, fitness_goal, experience_level, units, bodyweight, age, personal_factors)
 VALUES
-    ('Alex Rivera', 'alex@athletyx.test', 'muscle_gain', 'intermediate', 'lbs', 180),
-    ('Jordan Lee', 'jordan@athletyx.test', 'fat_loss', 'beginner', 'lbs', 165),
-    ('Sam Patel', 'sam@athletyx.test', 'endurance', 'advanced', 'kg', 78)
+    (
+        'Alex Rivera', 'alex@athletyx.test', 'muscle_gain', 'intermediate', 'lbs', 180, 28,
+        '{"max_effort_level": "aggressive", "injury_history": [], "movement_restrictions": [], "recovery_capacity": "fast", "medical_clearance": true, "notes": ""}'::jsonb
+    ),
+    (
+        'Jordan Lee', 'jordan@athletyx.test', 'fat_loss', 'beginner', 'lbs', 165, 34,
+        '{"max_effort_level": "conservative", "injury_history": ["lower back strain 2024"], "movement_restrictions": ["heavy deadlifts from floor"], "recovery_capacity": "slow", "medical_clearance": true, "notes": "Prefer machines and goblet squats over barbell back squat."}'::jsonb
+    ),
+    (
+        'Sam Patel', 'sam@athletyx.test', 'endurance', 'advanced', 'kg', 78, 41,
+        '{"max_effort_level": "moderate", "injury_history": ["right knee ACL repair 2021"], "movement_restrictions": ["deep knee flexion past 90 degrees", "pistol squats"], "recovery_capacity": "average", "medical_clearance": true, "notes": "Can push hard on upper body; keep leg intensity RPE 7 max."}'::jsonb
+    )
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO user_consents (user_id, ai_coaching, analytics, notifications)

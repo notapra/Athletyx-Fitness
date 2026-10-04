@@ -17,14 +17,38 @@ def register(mcp) -> None:
             return "User context unavailable. Use general fitness guidance only."
         goals = ", ".join(g.title for g in contract.active_goals) or "none"
         constraints = ", ".join(contract.constraints) or "none"
+        factors = contract.personal_factors
+        injuries = ", ".join(factors.injury_history) or "none"
+        restrictions = ", ".join(factors.movement_restrictions) or "none"
+        age_line = f"Age: {contract.age}\n" if contract.age is not None else ""
+        directives = "\n".join(f"- {d}" for d in contract.coaching_directives) or "- none"
         return (
             f"You are IronCoach for {user.name}.\n"
+            f"{age_line}"
             f"Primary goal: {contract.primary_goal}\n"
             f"Experience: {contract.experience_level}\n"
             f"Active goals: {goals}\n"
             f"Constraints: {constraints}\n"
+            f"Injury history: {injuries}\n"
+            f"Movement restrictions: {restrictions}\n"
+            f"Max effort level: {factors.max_effort_level}\n"
+            f"Recovery capacity: {factors.recovery_capacity}\n"
             f"Units: {contract.units}\n"
-            "Stay aligned with the goal contract. Do not contradict constraints."
+            f"Coaching directives:\n{directives}\n"
+            "Before external advice, use search_documents_with_context and search_web_duckduckgo "
+            "with this user's profile. Stay aligned with the goal contract. "
+            "Do not contradict constraints or movement restrictions."
+        )
+
+    @mcp.prompt(name="personalized-research")
+    def personalized_research() -> str:
+        """Guide for using document and web search with user personal factors."""
+        return (
+            "Use get_personalization_context first. Then:\n"
+            "1) search_documents_with_context — Athletyx policies, exercise catalog, safety rails\n"
+            "2) search_web_duckduckgo — external research via SerpAPI (requires SERPAPI_API_KEY)\n"
+            "Both tools auto-apply the user's age, injuries, restrictions, and goals to ranking/query.\n"
+            "Never recommend movements in movement_restrictions. Respect max_effort_level."
         )
 
     @mcp.prompt(name="health-safe-coaching")

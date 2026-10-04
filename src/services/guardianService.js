@@ -109,7 +109,7 @@ export function reviewCoachReply({ reply, userMessage, contract, chatHistory, se
   }
 }
 
-export function buildRefocusedReply(contract, analysis) {
+export function buildRefocusedReply(contract) {
   const sub = contract.activeGoals[0]
   const subLine = sub ? ` Target: ${sub.title}${sub.target ? ` (${sub.target})` : ''}.` : ''
   return `Refocusing on your goal: "${contract.primaryGoal}".${subLine} Based on your data — readiness and volume are logged. What specific lift or session do you want to plan next?`

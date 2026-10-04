@@ -1,12 +1,29 @@
 """Pydantic models for validated MCP tool responses."""
 
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
+
+from mcp_types import RecordId, UserId
+
+
+class PersonalFactors(BaseModel):
+    """Injury, effort, and recovery profile for safe personalized coaching."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    max_effort_level: Literal["conservative", "moderate", "aggressive"] = "moderate"
+    injury_history: list[str] = Field(default_factory=list)
+    movement_restrictions: list[str] = Field(default_factory=list)
+    recovery_capacity: Literal["slow", "average", "fast"] = "average"
+    medical_clearance: bool = True
+    notes: str = ""
 
 
 class User(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    id: int
+    id: UserId
     name: str
     email: str
     fitness_goal: str
@@ -14,6 +31,9 @@ class User(BaseModel):
     units: str = "lbs"
     bodyweight: float | None = None
     ai_enabled: bool = True
+    age: int | None = None
+    constraints: list[str] = Field(default_factory=list)
+    personal_factors: PersonalFactors = Field(default_factory=PersonalFactors)
 
 
 class UserQueryResult(BaseModel):
@@ -29,16 +49,16 @@ class UserListResult(BaseModel):
 
 
 class Goal(BaseModel):
-    id: int
-    user_id: int
+    id: RecordId
+    user_id: UserId
     title: str
     target: str | None = None
     completed: bool = False
 
 
 class WorkoutSessionSummary(BaseModel):
-    id: int
-    user_id: int
+    id: RecordId
+    user_id: UserId
     split: str
     duration: int
     notes: str
@@ -54,7 +74,7 @@ class SetRecord(BaseModel):
 
 
 class ExerciseEntryDetail(BaseModel):
-    id: int
+    id: RecordId
     exercise_name: str
     muscle_group: str | None = None
     sets: list[SetRecord] = Field(default_factory=list)
@@ -77,10 +97,13 @@ class GoalContract(BaseModel):
     active_goals: list[Goal]
     constraints: list[str]
     units: str
+    age: int | None = None
+    personal_factors: PersonalFactors = Field(default_factory=PersonalFactors)
+    coaching_directives: list[str] = Field(default_factory=list)
 
 
 class AuditEntry(BaseModel):
-    id: int
+    id: RecordId
     action: str
     resource: str | None = None
     payload: dict = Field(default_factory=dict)

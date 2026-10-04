@@ -15,8 +15,10 @@ import {
   createEmptySet,
   formatDuration,
   getSessionVolume,
+  sessionHasValidSets,
 } from '../../utils/session.js'
 import { useWorkoutTimer } from '../../hooks/useWorkoutTimer.js'
+import { hapticLight, hapticSuccess } from '../../utils/haptics.js'
 import RestTimer from './RestTimer.jsx'
 
 export default function ActiveWorkout({
@@ -31,6 +33,7 @@ export default function ActiveWorkout({
   const [exerciseQuery, setExerciseQuery] = useState('')
   const [split, setSplit] = useState(session.split ?? 'Upper')
   const [notes, setNotes] = useState(session.notes ?? '')
+  const [finishHint, setFinishHint] = useState('')
 
   const elapsed = useWorkoutTimer(session.startedAt, true)
   const suggestions = useMemo(
@@ -70,6 +73,7 @@ export default function ActiveWorkout({
     const newSet = duplicate && last ? createEmptySet(last) : createEmptySet()
     updateExercise(exIdx, { ...block, sets: [...block.sets, newSet] })
     restTimer.start(90)
+    hapticLight()
   }
 
   function updateSet(exIdx, setIdx, field, value) {
@@ -87,6 +91,12 @@ export default function ActiveWorkout({
   }
 
   function handleFinish() {
+    if (!sessionHasValidSets(session)) {
+      setFinishHint('Log at least one set with weight and reps before finishing.')
+      return
+    }
+    setFinishHint('')
+    hapticSuccess()
     onFinish({
       ...session,
       split,
@@ -100,6 +110,7 @@ export default function ActiveWorkout({
       <header className="safe-top flex items-center justify-between border-b border-zinc-800/80 px-4 pb-3 pt-14 backdrop-blur-xl">
         <button
           type="button"
+          data-testid="cancel-workout"
           onClick={onCancel}
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-800 text-zinc-400"
         >
@@ -113,6 +124,7 @@ export default function ActiveWorkout({
         </div>
         <button
           type="button"
+          data-testid="finish-workout"
           onClick={handleFinish}
           className="flex h-10 items-center gap-1.5 rounded-2xl bg-emerald-500 px-3 text-sm font-bold text-zinc-950"
         >
@@ -120,6 +132,12 @@ export default function ActiveWorkout({
           Finish
         </button>
       </header>
+
+      {finishHint ? (
+        <p className="border-b border-amber-500/20 bg-amber-500/10 px-4 py-2 text-center text-xs text-amber-200">
+          {finishHint}
+        </p>
+      ) : null}
 
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="mb-4 flex gap-2 overflow-x-auto no-scrollbar">
@@ -297,6 +315,7 @@ export default function ActiveWorkout({
 
       <motion.button
         type="button"
+        data-testid="add-exercise-fab"
         whileTap={{ scale: 0.95 }}
         onClick={() => setShowExercisePicker(true)}
         className="safe-bottom fixed bottom-6 right-4 z-50 flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-emerald-400 to-cyan-400 text-zinc-950 shadow-2xl shadow-emerald-500/30"

@@ -37,7 +37,15 @@ _POLICIES = {
     "athletyx://privacy/data-categories": json.dumps(
         {
             "contact": ["email", "name"],
-            "health_fitness": ["workouts", "bodyweight", "goals"],
+            "health_fitness": [
+                "workouts",
+                "bodyweight",
+                "goals",
+                "age",
+                "injury_history",
+                "movement_restrictions",
+                "max_effort_level",
+            ],
             "user_content": ["notes", "chat"],
             "identifiers": ["user_id"],
         },
@@ -111,3 +119,53 @@ def register(mcp) -> None:
     @mcp.resource("athletyx://exercises/catalog")
     def exercise_catalog() -> str:
         return (_CONTENT / "exercises.json").read_text(encoding="utf-8")
+
+    @mcp.resource("athletyx://coaching/personalization-guide")
+    def personalization_guide() -> str:
+        return (_CONTENT / "personalization-guide.md").read_text(encoding="utf-8")
+
+    @mcp.resource("athletyx://analytics/dashboard")
+    def analytics_dashboard() -> str:
+        return json.dumps(
+            {
+                "tools": [
+                    "get_training_analytics",
+                    "get_personal_records",
+                    "get_muscle_heat_map",
+                ],
+                "methodology": "athletyx://analytics/methodology",
+                "notes": "Volume = sum(reps × weight). Heat map counts sets by muscle group.",
+            },
+            indent=2,
+        )
+
+    @mcp.resource("athletyx://integrations/healthkit")
+    def healthkit_integration() -> str:
+        return """# HealthKit / Health Connect integration
+
+Phase 2 exposes MCP tools `sync_healthkit_workouts` and `get_healthkit_status`.
+
+**Planned native wiring**
+- iOS: Apple HealthKit workout samples via Capacitor plugin
+- Android: Health Connect exercise sessions
+
+**Permissions**
+- Read/write workouts and active energy (user-gated)
+
+**Until plugins ship**
+- Tools return `available: false` without mutating data
+- Users can continue logging workouts in IronLog; export/import arrives in a later mobile release
+"""
+
+    research_dir = _CONTENT / "research"
+    if research_dir.is_dir():
+        for path in sorted(research_dir.glob("*.md")):
+            uri = f"athletyx://research/{path.stem}"
+
+            def _make_research_reader(p: Path = path):
+                def _reader() -> str:
+                    return p.read_text(encoding="utf-8")
+
+                return _reader
+
+            mcp.resource(uri)(_make_research_reader())

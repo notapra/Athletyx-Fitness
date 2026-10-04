@@ -54,7 +54,10 @@ export default function SessionCard({ session, onDelete, onClick, delay = 0 }) {
         <div className="border-t border-zinc-800/80 px-4 pb-3">
           <button
             type="button"
-            onClick={() => onDelete(session.id)}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(session.id)
+            }}
             className="flex items-center gap-1 text-xs font-semibold text-red-400/80 hover:text-red-300"
           >
             <Trash2 className="h-3.5 w-3.5" />

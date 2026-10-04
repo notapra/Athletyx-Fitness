@@ -43,6 +43,7 @@ export default function Workouts({ onStartWorkout }) {
         </div>
         <motion.button
           type="button"
+          data-testid="new-workout"
           whileTap={{ scale: 0.95 }}
           onClick={handleStart}
           className="flex h-11 items-center gap-1.5 rounded-2xl bg-emerald-500 px-4 text-sm font-bold text-zinc-950"

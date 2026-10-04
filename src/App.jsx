@@ -1,6 +1,8 @@
 import { useCallback, useState } from 'react'
+import ErrorBoundary from './components/ErrorBoundary.jsx'
 import { AuthProvider } from './context/AuthContext.jsx'
 import { AppProvider } from './context/AppContext.jsx'
+import AuthGate from './components/auth/AuthGate.jsx'
 import { useApp } from './hooks/useApp.js'
 import AppShell from './components/layout/AppShell.jsx'
 import ActiveWorkout from './components/workout/ActiveWorkout.jsx'
@@ -12,6 +14,7 @@ import { sessionHasValidSets } from './utils/session.js'
 import Home from './pages/Home.jsx'
 import Workouts from './pages/Workouts.jsx'
 import Analytics from './pages/Analytics.jsx'
+import Nutrition from './pages/Nutrition.jsx'
 import AITrainer from './pages/AITrainer.jsx'
 import Profile from './pages/Profile.jsx'
 
@@ -44,7 +47,10 @@ function AppContent() {
       if (!sessionHasValidSets(session)) return
       const ok = finishWorkout(session)
       if (ok) {
-        const summary = getSessionSummary(session, [...sessions, session])
+        const allSessions = sessions.some((s) => s.id === session.id)
+          ? sessions.map((s) => (s.id === session.id ? session : s))
+          : [session, ...sessions]
+        const summary = getSessionSummary(session, allSessions)
         setSessionSummary(summary)
         setShowSummary(true)
       }
@@ -58,6 +64,8 @@ function AppContent() {
         return <Home onStartWorkout={handleStartWorkout} />
       case 'workouts':
         return <Workouts onStartWorkout={handleStartWorkout} />
+      case 'nutrition':
+        return <Nutrition />
       case 'analytics':
         return <Analytics />
       case 'ai-trainer':
@@ -116,10 +124,14 @@ function AppContent() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppProvider>
-        <AppContent />
-      </AppProvider>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <AuthGate>
+          <AppProvider>
+            <AppContent />
+          </AppProvider>
+        </AuthGate>
+      </AuthProvider>
+    </ErrorBoundary>
   )
 }

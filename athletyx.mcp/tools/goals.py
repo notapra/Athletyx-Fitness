@@ -31,7 +31,7 @@ def register(mcp) -> None:
         return safe_execute(_run)
 
     @mcp.tool(name="complete_goal")
-    def complete_goal_tool(goal_id: int) -> dict:
+    def complete_goal_tool(goal_id: str | int) -> dict:
         """Mark a goal complete. Audited."""
 
         def _run():

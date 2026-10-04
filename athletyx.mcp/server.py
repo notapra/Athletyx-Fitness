@@ -1,20 +1,30 @@
 """
 Athletyx MCP Server — app-store grade tools, resources, and prompts.
 
-Exposes user-scoped fitness data access over stdio. Set ATHLETYX_USER_ID in the
-client env block to identify the authenticated user.
+Phase 3 production auth:
+  MCP_REQUIRE_AUTH=true
+  ATHLETYX_MCP_JWT=<supabase access token>
+  ATHLETYX_DB_BACKEND=supabase
+  SUPABASE_URL / SUPABASE_ANON_KEY
+
+Development (local Postgres integer users):
+  ATHLETYX_USER_ID=1
+  ATHLETYX_DB_BACKEND=local
+
+Domain split (optional): ATHLETYX_MCP_DOMAIN=identity|workouts|goals|coaching|research|compliance|analytics|guardian|chat|account|healthkit|all|public
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import sys
 
 from mcp.server.fastmcp import FastMCP
 
 import prompts as prompts_module
 import resources as resources_module
-from tools import register_all
+from tools import register_domain
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,24 +33,50 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_DOMAIN = os.getenv("ATHLETYX_MCP_DOMAIN", "all").strip().lower()
+_REQUIRE_AUTH = os.getenv("MCP_REQUIRE_AUTH", "false").lower() in ("1", "true", "yes")
+_DB_BACKEND = os.getenv("ATHLETYX_DB_BACKEND", "local").strip().lower()
+
+_SERVER_NAMES = {
+    "all": "athletyx-fitness",
+    "public": "athletyx-public",
+    "identity": "athletyx-identity",
+    "workouts": "athletyx-workouts",
+    "goals": "athletyx-goals",
+    "coaching": "athletyx-coaching",
+    "research": "athletyx-research",
+    "compliance": "athletyx-compliance",
+    "analytics": "athletyx-analytics",
+    "guardian": "athletyx-guardian",
+    "chat": "athletyx-chat",
+    "account": "athletyx-account",
+    "healthkit": "athletyx-healthkit",
+}
+
 mcp = FastMCP(
-    "athletyx-fitness",
+    _SERVER_NAMES.get(_DOMAIN, f"athletyx-{_DOMAIN}"),
     instructions=(
         "Athletyx fitness MCP server (app-store grade). "
-        "Requires ATHLETYX_USER_ID in env for user-scoped tools. "
+        "Production: MCP_REQUIRE_AUTH + ATHLETYX_MCP_JWT (Supabase session). "
+        "Each user only accesses their own data via RLS. "
         "Read legal/health resources before coaching. "
-        "Use get_goal_contract before personalized advice. "
-        "Admin-only: search_users_by_profile (set ATHLETYX_ADMIN=true)."
+        "Use get_personalization_context and get_goal_contract before personalized advice."
     ),
 )
 
-register_all(mcp)
 resources_module.register(mcp)
-prompts_module.register(mcp)
+if _DOMAIN not in ("public",):
+    prompts_module.register(mcp)
+    register_domain(mcp, _DOMAIN)
 
 
 def main() -> None:
-    logger.info("Starting Athletyx MCP server (stdio)")
+    logger.info(
+        "Starting Athletyx MCP domain=%s backend=%s auth=%s",
+        _DOMAIN,
+        _DB_BACKEND,
+        "jwt" if _REQUIRE_AUTH else "legacy",
+    )
     mcp.run(transport="stdio")
 
 

@@ -31,7 +31,7 @@ def register(mcp) -> None:
         return safe_execute(_run)
 
     @mcp.tool()
-    def get_workout_session_detail(session_id: int) -> dict:
+    def get_workout_session_detail(session_id: str | int) -> dict:
         """Get a workout session with exercises and sets."""
 
         def _run():
@@ -56,7 +56,7 @@ def register(mcp) -> None:
 
     @mcp.tool(name="log_exercise_sets")
     def log_exercise_sets_tool(
-        session_id: int,
+        session_id: str | int,
         exercise_name: str,
         sets: list[dict],
         muscle_group: str | None = None,

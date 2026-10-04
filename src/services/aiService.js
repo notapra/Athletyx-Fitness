@@ -12,50 +12,26 @@
 
 import { buildChatPrompt } from '../utils/aiPrompts.js'
 import { reviewCoachReply, buildRefocusedReply } from './guardianService.js'
+import { sendAthletyxCoachMessage, getAthletyxHealth } from './athletyxService.js'
+import {
+  getCachedCoachResponse,
+  saveCachedCoachResponse,
+  recordCloudCoachCacheEvent,
+  getCloudCachedCoachResponse,
+  saveCloudCachedCoachResponse,
+} from './coachCache.js'
+import {
+  getChatHistory,
+  persistMessage,
+  clearChatHistory,
+} from './chatHistoryService.js'
+import { loadProfile } from '../utils/storage.js'
+import { buildCitationsFromAthletyxResponse } from '../utils/athletyxCitations.js'
 
-const CHAT_STORAGE_KEY = 'gymtracker_ai_chat_v1'
-
-const WELCOME =
-  "I'm IronCoach, your AI personal trainer. I analyze your workouts, recovery, and progression in real time — kept on track by Goal Guardian. Ask me anything about training, nutrition, or recovery."
+export { getChatHistory, persistMessage, clearChatHistory }
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function loadHistory() {
-  try {
-    const raw = localStorage.getItem(CHAT_STORAGE_KEY)
-    return raw ? JSON.parse(raw) : []
-  } catch {
-    return []
-  }
-}
-
-function saveHistory(messages) {
-  try {
-    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(messages.slice(-50)))
-  } catch {
-    /* storage full */
-  }
-}
-
-export async function getChatHistory() {
-  const local = loadHistory()
-  if (local.length > 0) {
-    return local.map((m) => ({ id: m.id, role: m.role, content: m.content ?? m.message }))
-  }
-  return [{ id: 'welcome', role: 'assistant', content: WELCOME }]
-}
-
-export async function clearChatHistory() {
-  localStorage.removeItem(CHAT_STORAGE_KEY)
-}
-
-export async function persistMessage(role, content) {
-  const history = loadHistory()
-  history.push({ id: crypto.randomUUID?.() ?? `m-${history.length}`, role, content })
-  saveHistory(history)
-  return history
 }
 
 function matchKeywords(text, words) {
@@ -131,11 +107,15 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     sessions = [],
     userId = null,
     refocusGoals = false,
+    profile = null,
+    goals = [],
+    useAthletyx = true,
+    onAthletyxStatus = null,
   } = options
 
   if (refocusGoals && contract) {
     return {
-      content: buildRefocusedReply(contract, analysis),
+      content: buildRefocusedReply(contract),
       driftScore: 0,
       guardianNote: null,
       warningLevel: null,
@@ -143,9 +123,118 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
   }
 
   let draft
+  let athletyxMeta = null
+
+  // Athletyx backend: RAG + SerpAPI + personalization (keys in PRIVATE.env on server)
+  if (useAthletyx) {
+    try {
+      const userProfile = profile ?? loadProfile()
+
+      // 1) Client IndexedDB cache (no network)
+      onAthletyxStatus?.('IronCoach · checking saved answers…')
+      const localCached = await getCachedCoachResponse(userMessage, {
+        profile: userProfile,
+        goals,
+      })
+      if (localCached.hit) {
+        onAthletyxStatus?.('IronCoach · reused saved answer')
+        draft = localCached.response.content
+        athletyxMeta = {
+          poweredBy: localCached.response.powered_by ?? 'Athletyx',
+          citations: buildCitationsFromAthletyxResponse(localCached.response),
+          searchTrace: localCached.response.search_trace ?? {},
+          personalizationApplied: localCached.response.personalization_applied,
+          fromCache: true,
+          cacheLayer: 'client',
+        }
+        if (userId && userId !== 'local') {
+          recordCloudCoachCacheEvent(userId, 'hit', {
+            cache_key: localCached.key?.slice(0, 16),
+            layer: 'client',
+          })
+        }
+      }
+
+      // 2) Cloud cache (Supabase) when signed in
+      if (!draft && userId && userId !== 'local') {
+        const cloudCached = await getCloudCachedCoachResponse(userId, userMessage, {
+          profile: userProfile,
+          goals,
+        })
+        if (cloudCached.hit) {
+          onAthletyxStatus?.('IronCoach · synced answer from cloud')
+          draft = cloudCached.response.content
+          athletyxMeta = {
+            poweredBy: cloudCached.response.powered_by ?? 'Athletyx',
+            citations: buildCitationsFromAthletyxResponse(cloudCached.response),
+            searchTrace: { ...(cloudCached.response.search_trace ?? {}), cache_hit: true, cache_layer: 'cloud' },
+            personalizationApplied: cloudCached.response.personalization_applied,
+            fromCache: true,
+            cacheLayer: 'cloud',
+          }
+          await saveCachedCoachResponse(userMessage, { profile: userProfile, goals }, cloudCached.response)
+        }
+      }
+
+      // 3) Live API (RAG + optional LLM; web search only when SerpAPI is configured)
+      if (!draft) {
+        onAthletyxStatus?.('Athletyx · checking connection…')
+        const health = await getAthletyxHealth()
+        if (health.ok) {
+          onAthletyxStatus?.('Athletyx · personalizing for your profile')
+          onAthletyxStatus?.('Athletyx · searching knowledge base (RAG)')
+          let ragTimer
+          if (health.webSearchAvailable) {
+            ragTimer = setTimeout(() => {
+              onAthletyxStatus?.('Athletyx · searching the web')
+            }, 900)
+          }
+          const result = await sendAthletyxCoachMessage(userMessage, {
+            profile: userProfile,
+            goals,
+            analysis,
+            useWebSearch: health.webSearchAvailable ? undefined : false,
+          })
+          if (ragTimer) clearTimeout(ragTimer)
+          onAthletyxStatus?.(
+            result.from_cache || result.search_trace?.cache_hit
+              ? 'Athletyx · reused saved answer'
+              : 'Athletyx · building your answer'
+          )
+          draft = result.content
+          athletyxMeta = {
+            poweredBy: result.powered_by ?? 'Athletyx',
+            citations: buildCitationsFromAthletyxResponse(result),
+            searchTrace: result.search_trace ?? {},
+            personalizationApplied: result.personalization_applied,
+            fromCache: Boolean(result.from_cache || result.cache?.cache_hit),
+            cacheLayer: result.search_trace?.cache_layer ?? (result.from_cache ? 'server' : null),
+            cacheStats: result.cache,
+          }
+
+          if (!result.from_cache && !result.search_trace?.cache_hit) {
+            await saveCachedCoachResponse(userMessage, { profile: userProfile, goals }, result)
+            if (userId && userId !== 'local') {
+              await saveCloudCachedCoachResponse(userId, userMessage, { profile: userProfile, goals }, result)
+              recordCloudCoachCacheEvent(userId, 'save', { cache_key: result.cache?.cache_key })
+            }
+          } else if (userId && userId !== 'local') {
+            recordCloudCoachCacheEvent(userId, 'hit', {
+              cache_key: result.cache?.cache_key,
+              layer: 'server',
+            })
+          }
+        }
+      }
+    } catch {
+      /* fall through to offline / OpenAI paths */
+    } finally {
+      onAthletyxStatus?.(null)
+    }
+  }
 
   // OpenAI-compatible chat completions — system prompt carries full user analytics context
-  if (useApi && apiEndpoint && apiKey) {
+  if (!draft && useApi && apiEndpoint && apiKey) {
     const prompt = buildChatPrompt(userMessage, analysis, contract)
     const response = await fetch(apiEndpoint, {
       method: 'POST',
@@ -164,18 +253,49 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     if (!response.ok) throw new Error('AI API request failed')
     const data = await response.json()
     draft = data.choices?.[0]?.message?.content ?? 'No response received.'
-  } else {
-    // Simulated latency so UX feels like a model call during demos without API keys
-    await delay(800 + Math.random() * 700)
-    draft = generateCoachResponse(userMessage, analysis, contract)
+  } else if (!draft) {
+    const userProfile = profile ?? loadProfile()
+    const offlineCached = await getCachedCoachResponse(userMessage, { profile: userProfile, goals })
+    if (offlineCached.hit) {
+      draft = offlineCached.response.content
+      athletyxMeta = {
+        poweredBy: offlineCached.response.powered_by ?? 'IronCoach',
+        fromCache: true,
+        cacheLayer: 'offline',
+        searchTrace: offlineCached.response.search_trace ?? {},
+      }
+    } else {
+      await delay(800 + Math.random() * 700)
+      draft = generateCoachResponse(userMessage, analysis, contract)
+      await saveCachedCoachResponse(userMessage, { profile: userProfile, goals }, {
+        content: draft,
+        powered_by: 'IronCoach Offline',
+        search_trace: { offline: true, cache_hit: false },
+      })
+      if (userId && userId !== 'local') {
+        await saveCloudCachedCoachResponse(userId, userMessage, { profile: userProfile, goals }, {
+          content: draft,
+          powered_by: 'IronCoach Offline',
+          search_trace: { offline: true },
+        })
+      }
+    }
+  }
+
+  const base = {
+    content: draft,
+    athletyxMeta,
+    driftScore: 0,
+    guardianNote: null,
+    warningLevel: null,
   }
 
   if (!contract) {
-    return { content: draft, driftScore: 0, guardianNote: null, warningLevel: null }
+    return base
   }
 
   // Supervisor layer: score drift vs goal contract before returning to UI
-  return reviewCoachReply({
+  const reviewed = await reviewCoachReply({
     reply: draft,
     userMessage,
     contract,
@@ -183,4 +303,5 @@ export async function sendChatMessage(userMessage, analysis, options = {}) {
     sessions,
     userId,
   })
+  return { ...reviewed, athletyxMeta }
 }

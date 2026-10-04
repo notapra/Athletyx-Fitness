@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { hapticMedium } from '../utils/haptics.js'
 
 const PRESETS = [60, 90, 180]
 
@@ -77,6 +78,7 @@ export function useRestTimer() {
         if (prev <= 1) {
           setIsRunning(false)
           playChime()
+          hapticMedium()
           return 0
         }
         return prev - 1

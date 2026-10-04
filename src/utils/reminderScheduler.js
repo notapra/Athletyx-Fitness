@@ -132,50 +132,42 @@ export function evaluateReminder({
   const cooldown = COOLDOWNS_HOURS[type] ?? 24
   if (hoursSince(lastType[type]) < cooldown) return null
 
-  let message = null
-
-  switch (type) {
-    case 'post_workout': {
+  const messageByType = {
+    post_workout: () => {
       const today = toDayKey(new Date())
       if (state.lastPostWorkoutDate === today) return null
-      message = contract.hasDefinedGoals
+      return contract.hasDefinedGoals
         ? `Session logged. Guardian check: does today's work support "${contract.primaryGoal}"?`
         : 'Great session! Set a primary goal in Profile so IronCoach stays on track.'
-      break
-    }
-    case 'weekly_review': {
+    },
+    weekly_review: () => {
       const day = new Date().getDay()
       const targetDay = prefs.weekly_review_day ?? 0
       const hour = new Date().getHours()
       if (day !== targetDay || hour < 17 || hour > 21) return null
-      message = `Weekly goal review: you're working toward "${contract.primaryGoal}". ${contract.activeGoals[0] ? `Focus: ${contract.activeGoals[0].title}` : 'Add a specific target in Profile.'}`
-      break
-    }
-    case 'drift_streak': {
+      return `Weekly goal review: you're working toward "${contract.primaryGoal}". ${contract.activeGoals[0] ? `Focus: ${contract.activeGoals[0].title}` : 'Add a specific target in Profile.'}`
+    },
+    drift_streak: () => {
       if (driftWarningCount < 3) return null
-      message =
-        'IronCoach drifted from your goals a few times. Tap "Refocus on my goals" in chat for tighter answers.'
-      break
-    }
-    case 'inactivity': {
+      return 'IronCoach drifted from your goals a few times. Tap "Refocus on my goals" in chat for tighter answers.'
+    },
+    inactivity: () => {
       if (!sessions?.length) return null
       const last = new Date(sessions[0].date)
       const daysSince = (Date.now() - last.getTime()) / (1000 * 60 * 60 * 24)
       if (daysSince < 3 || !contract.activeGoals.length) return null
-      message = `It's been ${Math.floor(daysSince)} days since your last workout. Your goal "${contract.activeGoals[0].title}" is still waiting — ready for a session?`
-      break
-    }
-    case 'daily_checkin': {
+      return `It's been ${Math.floor(daysSince)} days since your last workout. Your goal "${contract.activeGoals[0].title}" is still waiting — ready for a session?`
+    },
+    daily_checkin: () => {
       if (!prefs.daily_checkin) return null
       const morning = new Date().getHours()
       if (morning < 7 || morning > 10) return null
       if (toDayKey(sessions[0]?.date) === toDayKey(new Date())) return null
-      message = `Morning check-in: today supports "${contract.primaryGoal}". What's the plan?`
-      break
-    }
-    default:
-      return null
+      return `Morning check-in: today supports "${contract.primaryGoal}". What's the plan?`
+    },
   }
+
+  const message = messageByType[type]?.() ?? null
 
   if (!message) return null
 

@@ -35,15 +35,20 @@ Clients pass the authenticated user via environment variable:
 
 ## Phase 1 — Implemented
 
-### Tools (22)
+### Tools (25)
 
 | Domain | Tool | Access |
 |--------|------|--------|
 | **Identity** | `get_current_user_profile` | scoped |
 | | `update_profile_preferences` | scoped, audited |
+| | `update_personal_factors` | scoped, audited |
+| | `get_personalization_context` | scoped |
 | | `get_consent_status` | scoped |
 | | `update_consent` | scoped, audited |
 | | `get_data_inventory` | public |
+| **Research** | `search_documents_with_context` | scoped |
+| | `search_web_serpapi` | scoped, consent-gated |
+| | `search_web_duckduckgo` | scoped, consent-gated (alias) |
 | **Workouts** | `get_workout_sessions` | scoped |
 | | `get_workout_session_detail` | scoped |
 | | `create_workout_session` | scoped, audited |
@@ -60,7 +65,7 @@ Clients pass the authenticated user via environment variable:
 | | `get_user_by_email` | admin or self |
 | | `search_users_by_profile` | admin only |
 
-### Resources (10)
+### Resources (11)
 
 | URI | Content |
 |-----|---------|
@@ -74,12 +79,14 @@ Clients pass the authenticated user via environment variable:
 | `athletyx://ai/safety-rails` | Coach must-not rules |
 | `athletyx://exercises/catalog` | Exercise JSON catalog |
 | `athletyx://analytics/methodology` | How metrics are computed |
+| `athletyx://coaching/personalization-guide` | Age, injury, effort personalization |
 
-### Prompts (5)
+### Prompts (6)
 
 | Name | Purpose |
 |------|---------|
-| `coaching-with-goal-contract` | Inject goal + constraints |
+| `coaching-with-goal-contract` | Inject goal + personal factors + constraints |
+| `personalized-research` | Document + SerpAPI search workflow |
 | `health-safe-coaching` | Disclaimer + conservative tone |
 | `post-workout-debrief` | After-session summary |
 | `refusal-medical-advice` | Diagnosis / prescription refusal |
@@ -87,25 +94,92 @@ Clients pass the authenticated user via environment variable:
 
 ---
 
-## Phase 2 — Planned
+## Phase 2 — Implemented
 
-| Domain | Tools / resources |
-|--------|-------------------|
-| **Analytics** | `get_training_analytics`, `get_personal_records`, `get_muscle_heat_map`, dashboard resource |
-| **Guardian** | `run_guardian_check`, `get_guardian_history`, reminder tools |
-| **Chat** | `get_chat_history`, `append_chat_message` |
-| **Account** | `export_user_data`, `request_account_deletion` |
-| **HealthKit** | `sync_healthkit_workouts`, integration resources |
+| Domain | Tools / resources | Access |
+|--------|-------------------|--------|
+| **Analytics** | `get_training_analytics`, `get_personal_records`, `get_muscle_heat_map` | scoped |
+| | Resource `athletyx://analytics/dashboard` | public |
+| **Guardian** | `run_guardian_check`, `get_guardian_history`, `get_guardian_reminder_policy` | scoped |
+| **Chat** | `get_chat_history`, `append_chat_message` | scoped, audited |
+| **Account** | `export_user_data`, `request_account_deletion` | scoped, audited |
+| **HealthKit** | `sync_healthkit_workouts`, `get_healthkit_status` | scoped (stub until native plugins) |
+| | Resource `athletyx://integrations/healthkit` | public |
+
+Domain servers: set `ATHLETYX_MCP_DOMAIN` to `analytics`, `guardian`, `chat`, `account`, or `healthkit`.
 
 ---
 
-## Phase 3 — Production hardening
+## Phase 3 — Production hardening (in progress)
 
-- OAuth / JWT instead of `ATHLETYX_USER_ID` env
-- Read replica for agent queries
-- Rate limits per user
-- Separate MCP servers by domain (stay under ~40 tools per client)
-- Supabase RLS alignment with `public.profiles` UUID schema
+| Item | Status |
+|------|--------|
+| OAuth / JWT instead of `ATHLETYX_USER_ID` env | **Implemented** — `MCP_REQUIRE_AUTH` + `ATHLETYX_MCP_JWT` |
+| Rate limits per user | **Implemented** — `MCP_RATE_LIMIT_PER_HOUR` (default 120/hr) |
+| Separate MCP servers by domain | **Implemented** — `ATHLETYX_MCP_DOMAIN` + Settings → MCP access |
+| Supabase RLS alignment with `public.profiles` UUID | **Implemented** — `ATHLETYX_DB_BACKEND=supabase` + PostgREST JWT |
+| Read replica for agent queries | Planned |
+
+### Production MCP env (per user)
+
+```json
+"env": {
+  "MCP_REQUIRE_AUTH": "true",
+  "ATHLETYX_DB_BACKEND": "supabase",
+  "ATHLETYX_MCP_JWT": "<supabase access token from IronLog Settings>",
+  "ATHLETYX_MCP_DOMAIN": "identity",
+  "SUPABASE_URL": "https://YOUR_PROJECT.supabase.co",
+  "SUPABASE_ANON_KEY": "YOUR_ANON_KEY"
+}
+```
+
+Load domain-specific configs from **IronLog → Settings → MCP access** or `GET /api/mcp/session` (Bearer JWT).
+
+Legacy dev (local integer `users` table):
+
+```json
+"env": {
+  "ATHLETYX_USER_ID": "1",
+  "ATHLETYX_DB_BACKEND": "local",
+  "DB_HOST": "localhost",
+  "DB_PORT": "5433"
+}
+```
+
+---
+
+## Personalization & research
+
+Agents must call `get_personalization_context` (or `get_goal_contract`) before coaching.
+Profile fields drive intensity, substitutions, and search ranking.
+
+### Personal factors (`users.personal_factors` JSONB)
+
+| Field | Values | Purpose |
+|-------|--------|---------|
+| `age` | integer column | Volume, recovery, joint stress |
+| `max_effort_level` | conservative / moderate / aggressive | RPE caps, failure tolerance |
+| `injury_history` | string[] | Past injuries that may flare |
+| `movement_restrictions` | string[] | Movements to avoid |
+| `recovery_capacity` | slow / average / fast | Session spacing |
+| `medical_clearance` | boolean | Physician OK for exercise |
+| `notes` | string | Free-text context |
+
+Update via `update_personal_factors` or `update_profile_preferences` (age, constraints).
+
+### Document search
+
+`search_documents_with_context(query)` ranks Athletyx resources (policies, exercise catalog,
+safety rails, personalization guide) using the user's goal, age, injuries, and restrictions.
+
+### Web search (SerpAPI + DuckDuckGo)
+
+`search_web_serpapi(query, engine)` calls `https://serpapi.com/search.json` with the
+query enriched by the user's personalization context. `engine` is `duckduckgo` (default) or `google`.
+
+**Setup:** copy `athletyx.mcp/.env.example` → `athletyx.mcp/.env` and set `SERPAPI_API_KEY`.
+The `.env` file is **gitignored** — never commit API keys to the public repo.
+See `athletyx.mcp/SECRETS.md`. Requires `ai_coaching` consent.
 
 ---
 
@@ -115,9 +189,10 @@ Clients pass the authenticated user via environment variable:
 |-------------------|-------------|
 | Account deletion | Phase 2 `request_account_deletion` |
 | Data export | Phase 2 `export_user_data` |
-| Privacy labels | `athletyx://privacy/data-categories` |
+| Privacy labels | `athletyx://privacy/data-categories` + age/injury fields |
 | Health disclaimer | `athletyx://legal/health-disclaimer` + `health-safe-coaching` prompt |
 | AI disclosure | `athletyx://legal/ai-disclosure` |
+| Injury-safe coaching | `personal_factors`, `coaching_directives`, `personalization-guide` |
 | No cross-user leaks | `ATHLETYX_USER_ID` scoping + admin gate |
 | Audit trail | `audit_log` table + `get_audit_log` |
 
@@ -127,7 +202,7 @@ Clients pass the authenticated user via environment variable:
 
 | Table | Purpose |
 |-------|---------|
-| `users` | Profile (extended with preferences JSON) |
+| `users` | Profile (age, personal_factors JSON, preferences, constraints) |
 | `goals` | User goals |
 | `workout_sessions` | Session metadata |
 | `exercise_entries` | Exercises per session |
@@ -155,6 +230,13 @@ Clients pass the authenticated user via environment variable:
     "ATHLETYX_USER_ID": "1"
   }
 }
+```
+
+SerpAPI key: use `athletyx.mcp/.env` (see `SECRETS.md`), not committed config:
+
+```bash
+cp athletyx.mcp/.env.example athletyx.mcp/.env
+# edit SERPAPI_API_KEY in .env
 ```
 
 ### Inspector

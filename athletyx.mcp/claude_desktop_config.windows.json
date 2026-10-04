@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "athletyx-user-data": {
+      "command": "C:\\Python313\\python.exe",
+      "args": [
+        "C:\\Users\\apraj_19r1os0\\OneDrive\\Documents\\GymTracker\\athletyx.mcp\\server.py"
+      ],
+      "env": {
+        "DB_HOST": "localhost",
+        "DB_PORT": "5433",
+        "DB_NAME": "postgres",
+        "DB_USER": "postgres",
+        "DB_PASSWORD": "postgres",
+        "ATHLETYX_USER_ID": "1"
+      }
+    },
+    "athletyx-postgres-storage": {
+      "command": "D:\\npx.cmd",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-postgres",
+        "postgresql://postgres:postgres@localhost:5433/postgres"
+      ]
+    }
+  }
+}

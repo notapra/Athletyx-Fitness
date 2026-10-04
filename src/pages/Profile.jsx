@@ -24,6 +24,11 @@ import SettingsPage from './Settings.jsx'
 import { getBodyweightTrend } from '../utils/insights.js'
 import { getDashboardStats } from '../utils/calculations.js'
 import { getTrainingStreak } from '../utils/date.js'
+import {
+  getPersonalFactors,
+  EFFORT_LEVELS,
+  RECOVERY_OPTIONS,
+} from '../utils/personalFactors.js'
 
 export default function Profile() {
   const { profile, updateProfile } = useAuth()
@@ -36,6 +41,10 @@ export default function Profile() {
   const [username, setUsername] = useState(profile?.username ?? '')
   const [fitnessGoal, setFitnessGoal] = useState(profile?.fitness_goal ?? '')
   const [constraintInput, setConstraintInput] = useState('')
+  const [ageInput, setAgeInput] = useState(profile?.age ?? '')
+  const [injuryInput, setInjuryInput] = useState('')
+  const [restrictionInput, setRestrictionInput] = useState('')
+  const personalFactors = getPersonalFactors(profile)
 
   const stats = useMemo(() => getDashboardStats(sessions), [sessions])
   const streak = useMemo(() => getTrainingStreak(sessions), [sessions])
@@ -61,7 +70,53 @@ export default function Profile() {
     const updates = {}
     if (username.trim()) updates.username = username.trim()
     if (fitnessGoal.trim()) updates.fitness_goal = fitnessGoal.trim()
+    const age = Number(ageInput)
+    if (ageInput !== '' && age > 0) updates.age = age
     if (Object.keys(updates).length > 0) await updateProfile(updates)
+  }
+
+  async function savePersonalFactors(patch) {
+    await updateProfile({
+      ai_preferences: {
+        ...(profile?.ai_preferences ?? {}),
+        personal_factors: {
+          ...personalFactors,
+          ...patch,
+        },
+      },
+    })
+  }
+
+  async function handleAddInjury(e) {
+    e.preventDefault()
+    const text = injuryInput.trim()
+    if (!text) return
+    await savePersonalFactors({
+      injury_history: [...personalFactors.injury_history, text],
+    })
+    setInjuryInput('')
+  }
+
+  async function handleAddRestriction(e) {
+    e.preventDefault()
+    const text = restrictionInput.trim()
+    if (!text) return
+    await savePersonalFactors({
+      movement_restrictions: [...personalFactors.movement_restrictions, text],
+    })
+    setRestrictionInput('')
+  }
+
+  async function handleRemoveInjury(index) {
+    await savePersonalFactors({
+      injury_history: personalFactors.injury_history.filter((_, i) => i !== index),
+    })
+  }
+
+  async function handleRemoveRestriction(index) {
+    await savePersonalFactors({
+      movement_restrictions: personalFactors.movement_restrictions.filter((_, i) => i !== index),
+    })
   }
 
   async function handleAddConstraint(e) {
@@ -122,6 +177,7 @@ export default function Profile() {
         </div>
         <button
           type="button"
+          data-testid="open-settings"
           onClick={() => setShowSettings(true)}
           className="flex h-10 w-10 items-center justify-center rounded-2xl border border-zinc-800 text-zinc-400"
         >
@@ -188,6 +244,102 @@ export default function Profile() {
           </ul>
         ) : null}
       </div>
+
+      <section className="rounded-3xl border border-violet-500/20 bg-violet-500/5 p-4">
+        <h2 className="mb-1 text-sm font-semibold text-white">Personal factors (Athletyx)</h2>
+        <p className="mb-3 text-[10px] text-zinc-500">
+          Used by IronCoach for injury-safe advice, document search, and web research
+        </p>
+        <div className="mb-3 grid grid-cols-2 gap-2">
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Age</label>
+            <input
+              type="number"
+              min={13}
+              max={100}
+              value={ageInput}
+              onChange={(e) => setAgeInput(e.target.value)}
+              onBlur={handleSaveProfile}
+              placeholder="e.g. 34"
+              className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-white"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Max effort</label>
+            <select
+              value={personalFactors.max_effort_level}
+              onChange={(e) => savePersonalFactors({ max_effort_level: e.target.value })}
+              className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-white"
+            >
+              {EFFORT_LEVELS.map((o) => (
+                <option key={o.id} value={o.id}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="mb-3">
+          <label className="mb-1 block text-[10px] uppercase tracking-wider text-zinc-500">Recovery</label>
+          <select
+            value={personalFactors.recovery_capacity}
+            onChange={(e) => savePersonalFactors({ recovery_capacity: e.target.value })}
+            className="w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-sm text-white"
+          >
+            {RECOVERY_OPTIONS.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <form onSubmit={handleAddInjury} className="mb-2 flex gap-2">
+          <input
+            value={injuryInput}
+            onChange={(e) => setInjuryInput(e.target.value)}
+            placeholder="Injury history (e.g. shoulder impingement 2023)"
+            className="flex-1 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs text-white"
+          />
+          <button type="submit" className="rounded-2xl bg-violet-500/20 px-3 text-xs font-semibold text-violet-200">
+            Add
+          </button>
+        </form>
+        {personalFactors.injury_history.length > 0 ? (
+          <ul className="mb-2 space-y-1">
+            {personalFactors.injury_history.map((item, i) => (
+              <li key={i} className="flex items-center justify-between rounded-xl bg-zinc-950/50 px-3 py-2 text-xs text-zinc-400">
+                <span>• {item}</span>
+                <button type="button" onClick={() => handleRemoveInjury(i)} className="text-red-400/70">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+        <form onSubmit={handleAddRestriction} className="flex gap-2">
+          <input
+            value={restrictionInput}
+            onChange={(e) => setRestrictionInput(e.target.value)}
+            placeholder="Avoid movement (e.g. overhead press)"
+            className="flex-1 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs text-white"
+          />
+          <button type="submit" className="rounded-2xl bg-violet-500/20 px-3 text-xs font-semibold text-violet-200">
+            Add
+          </button>
+        </form>
+        {personalFactors.movement_restrictions.length > 0 ? (
+          <ul className="mt-2 space-y-1">
+            {personalFactors.movement_restrictions.map((item, i) => (
+              <li key={i} className="flex items-center justify-between rounded-xl bg-zinc-950/50 px-3 py-2 text-xs text-amber-200/80">
+                <span>• {item}</span>
+                <button type="button" onClick={() => handleRemoveRestriction(i)} className="text-red-400/70">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </section>
 
       <div className="grid grid-cols-3 gap-2">
         <Card className="!p-3 text-center">
